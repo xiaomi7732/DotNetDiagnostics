@@ -18,13 +18,21 @@ public static class DotNetCountersServiceCollectionExtensions
     /// </remarks>
     /// <param name="services">The <see cref="IServiceCollection"/> to add the <see cref="HealthCheckService"/> to.</param>
     /// <returns>An instance of <see cref="IHealthChecksBuilder"/> from which health checks can be registered.</returns>
-    public static IServiceCollection AddDotNetCounters(this IServiceCollection services, string configurationSectionName = "DotNetCounters")
+    public static IServiceCollection AddDotNetCounters(this IServiceCollection services,
+        string webHookConfigurationSectionName = "DotNetCountersWebHook",
+        string dotnetCountersClientConfigurationSectionName = "DotNetCounters")
     {
-        services.TryAddSingleton<IDotNetCountersClient, DummyDotNetCountersClient>();
+        services.TryAddSingleton<IDotNetCountersClient, DotNetCountersClient>();
         services.AddOptions<DotNetCountersWebhookOptions>().Configure<IConfiguration>((opt, config) =>
         {
-            config.GetSection(configurationSectionName).Bind(opt);
+            config.GetSection(webHookConfigurationSectionName).Bind(opt);
         });
+
+        services.AddOptions<DotNetCountersOptions>().Configure<IConfiguration>((opt, config) =>
+        {
+            config.GetSection(dotnetCountersClientConfigurationSectionName).Bind(opt);
+        });
+
         return services;
     }
 }
