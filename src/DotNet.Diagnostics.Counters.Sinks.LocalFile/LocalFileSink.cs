@@ -15,16 +15,19 @@ internal sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPaylo
         SingleWriter = false,
     });
     private readonly IPayloadWriter _payloadWriter;
+    private readonly LoggingFileNameProvider _fileNameProvider;
     private readonly ILogger _logger;
 
     public LocalFileSink(
         IOptions<LocalFileSinkOptions> options,
         IPayloadWriter payloadWriter,
+        LoggingFileNameProvider fileNameProvider,
         ILogger<LocalFileSink> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
         _payloadWriter = payloadWriter ?? throw new ArgumentNullException(nameof(payloadWriter));
+        _fileNameProvider = fileNameProvider ?? throw new ArgumentNullException(nameof(fileNameProvider));
     }
 
     public bool Submit(ICounterPayload data)
@@ -41,13 +44,14 @@ internal sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPaylo
     {
         await foreach (ICounterPayload data in _workingQueue.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
-            await WriterDataAsync(data, cancellationToken).ConfigureAwait(false);
+            await WriteDataAsync(data, cancellationToken).ConfigureAwait(false);
         }
     }
 
-    private async Task WriterDataAsync(ICounterPayload payload, CancellationToken cancellationToken)
+    private async Task WriteDataAsync(ICounterPayload payload, CancellationToken cancellationToken)
     {
         string fullFileName = GetFullFileName(payload.Timestamp);
+        Directory.CreateDirectory(Path.GetDirectoryName(fullFileName)!);
 
         FileStreamOptions fileStreamOptions = new FileStreamOptions()
         {
@@ -85,10 +89,7 @@ internal sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPaylo
     }
 
     private string GetFullFileName(DateTime timestamp)
-        => Path.Combine(
-            Environment.ExpandEnvironmentVariables(_options.OutputFolder),
-            $"{_options.FileNamePrefix}.{timestamp.ToString("yyyyMMddHH")}.csv"
-        );
+        => _fileNameProvider.GetFullFileName(timestamp, ".csv");
 
     private Task WriteDataAsync(Stream writeTo, ICounterPayload data, CancellationToken cancellationToken)
         => _payloadWriter.WriteAsync(writeTo, data, cancellationToken);

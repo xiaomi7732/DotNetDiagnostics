@@ -15,6 +15,8 @@ public static class LocalFileSinkServiceCollectionExtensions
             configure.GetSection(sectionName).Bind(opt);
         });
 
+        services.AddSingleton<WebAppContext>(_ => WebAppContext.Instance);
+        services.AddSingleton<LoggingFileNameProvider>();
         services.AddSingleton<LocalFileSink>();
         services.AddSingleton<ISink<IDotNetCountersClient, ICounterPayload>>(p => p.GetRequiredService<LocalFileSink>());
         services.AddHostedService<LocalFileSinkBackgroundService>();
