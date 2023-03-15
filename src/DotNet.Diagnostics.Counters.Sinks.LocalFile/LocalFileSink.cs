@@ -60,13 +60,25 @@ internal sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPaylo
         {
             _logger.LogInformation("Open writing: {fileName}", fullFileName);
             _currentStream = File.Open(fullFileName, fileStreamOptions);
+            await WriteHeaderAsync(_currentStream, cancellationToken).ConfigureAwait(false);
         }
 
         if (!string.Equals(_currentStream.Name, fullFileName, StringComparison.OrdinalIgnoreCase))
         {
-            await _currentStream.DisposeAsync();
-            _logger.LogInformation("Open new file for writing: {fileName}", fullFileName);
-            _currentStream = File.Open(fullFileName, fileStreamOptions);
+            try
+            {
+                await _currentStream.DisposeAsync().ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected disposing the last output: {fileName}. Data file might be corrupted.", _currentStream.Name);
+            }
+            finally
+            {
+                _logger.LogInformation("Open new file for writing: {fileName}", fullFileName);
+                _currentStream = File.Open(fullFileName, fileStreamOptions);
+                await WriteHeaderAsync(_currentStream, cancellationToken).ConfigureAwait(false);
+            }
         }
 
         await WriteDataAsync(_currentStream, payload, cancellationToken).ConfigureAwait(false);
@@ -80,6 +92,20 @@ internal sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPaylo
 
     private Task WriteDataAsync(Stream writeTo, ICounterPayload data, CancellationToken cancellationToken)
         => _payloadWriter.WriteAsync(writeTo, data, cancellationToken);
+
+    private Task WriteHeaderAsync(Stream writeTo, CancellationToken cancellationToken)
+    {
+        if (writeTo.Position != 0)
+        {
+            return Task.CompletedTask;
+        }
+        return _payloadWriter switch
+        {
+            IPayloadHeaderWriter headerWriter => headerWriter.WriteHeaderAsync(writeTo, cancellationToken),
+            _ => Task.CompletedTask,
+        };
+    }
+
 
     public async ValueTask DisposeAsync()
     {
