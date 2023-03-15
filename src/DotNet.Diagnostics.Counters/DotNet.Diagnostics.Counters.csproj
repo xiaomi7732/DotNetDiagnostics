@@ -7,4 +7,8 @@
     <PackageReference Include="Microsoft.Diagnostics.NETCore.Client" Version="0.2.410101" />
     <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" Version="3.0.8" />
   </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DotNet.Diagnostics.Core\DotNet.Diagnostics.Core.csproj" />
+  </ItemGroup>
 </Project>

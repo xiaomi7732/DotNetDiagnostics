@@ -1,3 +1,4 @@
+using DotNet.Diagnostics.Core;
 using Microsoft.Extensions.Logging;
 
 namespace DotNet.Diagnostics.Counters;

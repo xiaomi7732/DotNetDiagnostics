@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Diagnostics.Tracing;
 using System.Globalization;
+using DotNet.Diagnostics.Core;
 using Microsoft.Diagnostics.NETCore.Client;
 using Microsoft.Diagnostics.Tracing;
 using Microsoft.Extensions.Logging;
@@ -13,15 +14,23 @@ public sealed class DotNetCountersClient : IDotNetCountersClient, IAsyncDisposab
     private readonly DiagnosticsClient _diagnosticsClient;
     private EventPipeSession? _eventPipeSession;
     private EventPipeEventSource? _eventPipeEventSource;
+    private Stream? _outputStream;
     private readonly DotNetCountersOptions _options;
+    private readonly IEnumerable<ISink<DotNetCountersClient, ICounterPayload>> _outputSinks;
+    private readonly IPayloadWriter _payloadWriter;
     private readonly ILogger _logger;
 
     public DotNetCountersClient(
+        IEnumerable<ISink<DotNetCountersClient, ICounterPayload>>? outputSinks,
+        IPayloadWriter payloadWriter,
         IOptions<DotNetCountersOptions> options,
         ILogger<DotNetCountersClient> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+
+        _outputSinks = outputSinks ?? Enumerable.Empty<ISink<DotNetCountersClient, ICounterPayload>>();
+        _payloadWriter = payloadWriter ?? throw new ArgumentNullException(nameof(payloadWriter));
 
         int processId = int.MinValue;
         using (Process p = Process.GetCurrentProcess())
@@ -87,6 +96,7 @@ public sealed class DotNetCountersClient : IDotNetCountersClient, IAsyncDisposab
         {
             try
             {
+                _outputStream = new MemoryStream();
                 _eventPipeSession = _diagnosticsClient.StartEventPipeSession(GetEventPipeProviders(), requestRundown: false, circularBufferMB: 10);
                 _diagnosticsClient.ResumeRuntime();
                 _eventPipeEventSource = new EventPipeEventSource(_eventPipeSession.EventStream);
@@ -106,7 +116,7 @@ public sealed class DotNetCountersClient : IDotNetCountersClient, IAsyncDisposab
         return Task.FromResult(true);
     }
 
-    private void DynamicAllMonitor(TraceEvent traceEventObject)
+    private async void DynamicAllMonitor(TraceEvent traceEventObject)
     {
         _logger.LogDebug("Get trace event object: {name}", traceEventObject.EventName);
 
@@ -116,16 +126,34 @@ public sealed class DotNetCountersClient : IDotNetCountersClient, IAsyncDisposab
             IDictionary<string, object> payloadFields = (IDictionary<string, object>)(payloadVal["Payload"]);
             dynamic y = payloadVal["Payload"];
 
-            // If it's not a counter we asked for, ignore it.
-            // if (!filter.Filter(traceEventObject.ProviderName, payloadFields["Name"].ToString())) return;
-
-            // ICounterPayload payload = payloadFields["CounterType"].Equals("Sum") ? (ICounterPayload)new IncrementingCounterPayload(payloadFields, _interval) : (ICounterPayload)new CounterPayload(payloadFields);
-            // _renderer.CounterPayloadReceived(traceEventObject.ProviderName, payload, pauseCmdSet);
-
-            foreach (KeyValuePair<string, object> item in payloadFields)
+            ICounterPayload payload;
+            if (CounterPayload.TryParse(payloadFields, traceEventObject, out CounterPayload? counterPayload))
             {
-                _logger.LogInformation("Key: {key}", item.Key);
-                _logger.LogInformation("Value: {value}", item.Value);
+                payload = counterPayload!;
+            }
+            else if (IncrementingCounterPayload.TryParse(payloadFields, traceEventObject, out IncrementingCounterPayload? incrementingCounterPayload))
+            {
+                payload = incrementingCounterPayload!;
+            }
+            else
+            {
+                _logger.LogError("Payload can't be parsed: {payload}", string.Join(",", payloadFields.Select(item => string.Join("=", item.Key, item.Value))));
+                return;
+            }
+
+            // Write to sinks
+            foreach (ISink<DotNetCountersClient, ICounterPayload> sink in _outputSinks)
+            {
+                // TODO: Extend this to support json writer.
+                // Writer header
+                try
+                {
+                    sink.Submit(payload);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Unexpected error writing payload to sink of {sinkType}", sink.GetType());
+                }
             }
         }
     }
@@ -150,7 +178,7 @@ public sealed class DotNetCountersClient : IDotNetCountersClient, IAsyncDisposab
         await DisposeCoreAsync();
     }
 
-    private ValueTask DisposeCoreAsync()
+    private async ValueTask DisposeCoreAsync()
     {
         _eventPipeSession?.Dispose();
         _eventPipeSession = null;
@@ -158,6 +186,10 @@ public sealed class DotNetCountersClient : IDotNetCountersClient, IAsyncDisposab
         _eventPipeEventSource?.Dispose();
         _eventPipeEventSource = null;
 
-        return ValueTask.CompletedTask;
+        if (_outputStream is not null)
+        {
+            await _outputStream.DisposeAsync().ConfigureAwait(false);
+        }
+        _outputStream = null;
     }
 }
