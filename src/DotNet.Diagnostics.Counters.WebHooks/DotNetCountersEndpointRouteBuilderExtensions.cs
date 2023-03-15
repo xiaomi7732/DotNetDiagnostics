@@ -1,5 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
-using DotNet.Diagnostics.Core;
+using DotNet.Diagnostics.Counters;
 using DotNet.Diagnostics.Counters.WebHooks;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
@@ -52,13 +52,6 @@ public static class DotNetCountersEndpointRouteBuilderExtensions
         {
             throw new InvalidOperationException($"Unable to find service {nameof(IDotNetCountersClient)} in {nameof(IServiceCollection)}.");
         }
-        // if (endpoints.ServiceProvider.GetService(typeof(HealthCheckService)) == null)
-        // {
-        //     throw new InvalidOperationException(Resources.FormatUnableToFindServices(
-        //         nameof(IServiceCollection),
-        //         nameof(HealthCheckServiceCollectionExtensions.AddHealthChecks),
-        //         "ConfigureServices(...)"));
-        // }
 
         var args = options != null ? new[] { Options.Create(options) } : Array.Empty<object>();
 

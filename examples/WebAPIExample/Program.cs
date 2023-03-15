@@ -4,6 +4,7 @@ builder.Services.AddLogging(loggingBuilder => loggingBuilder.AddSimpleConsole(op
     opt.SingleLine = true;
 }));
 builder.Services.AddDotNetCounters();
+builder.Services.AddDotNetCounterLocalFileSink();
 
 var app = builder.Build();
 app.MapGet("/", () => "Hello World!");

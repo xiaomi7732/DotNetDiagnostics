@@ -1,4 +1,4 @@
-namespace DotNet.Diagnostics.Core;
+namespace DotNet.Diagnostics.Counters;
 public interface IDotNetCountersClient
 {
     Task<bool> EnableAsync(CancellationToken cancellationToken);

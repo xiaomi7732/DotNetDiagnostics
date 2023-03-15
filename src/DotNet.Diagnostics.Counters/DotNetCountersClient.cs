@@ -11,26 +11,34 @@ namespace DotNet.Diagnostics.Counters;
 
 public sealed class DotNetCountersClient : IDotNetCountersClient, IAsyncDisposable
 {
+    private bool _isEnabled = false;
+    private readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
     private readonly DiagnosticsClient _diagnosticsClient;
     private EventPipeSession? _eventPipeSession;
     private EventPipeEventSource? _eventPipeEventSource;
     private Stream? _outputStream;
     private readonly DotNetCountersOptions _options;
-    private readonly IEnumerable<ISink<DotNetCountersClient, ICounterPayload>> _outputSinks;
-    private readonly IPayloadWriter _payloadWriter;
+    private readonly IEnumerable<ISink<IDotNetCountersClient, ICounterPayload>> _outputSinks;
     private readonly ILogger _logger;
 
     public DotNetCountersClient(
-        IEnumerable<ISink<DotNetCountersClient, ICounterPayload>>? outputSinks,
-        IPayloadWriter payloadWriter,
+        IEnumerable<ISink<IDotNetCountersClient, ICounterPayload>>? outputSinks,
         IOptions<DotNetCountersOptions> options,
         ILogger<DotNetCountersClient> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
 
-        _outputSinks = outputSinks ?? Enumerable.Empty<ISink<DotNetCountersClient, ICounterPayload>>();
-        _payloadWriter = payloadWriter ?? throw new ArgumentNullException(nameof(payloadWriter));
+        _outputSinks = outputSinks ?? Enumerable.Empty<ISink<IDotNetCountersClient, ICounterPayload>>();
+
+        if (!_outputSinks.Any())
+        {
+            _logger.LogWarning("There's no output sink.");
+        }
+        else
+        {
+            _logger.LogInformation("There are {count} output sinks configured.", _outputSinks.Count());
+        }
 
         int processId = int.MinValue;
         using (Process p = Process.GetCurrentProcess())
@@ -48,13 +56,36 @@ public sealed class DotNetCountersClient : IDotNetCountersClient, IAsyncDisposab
 
     public async Task<bool> DisableAsync(CancellationToken cancellationToken)
     {
+        _logger.LogInformation("Disabling dotnet-counters...");
+        await _lock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            if (!_isEnabled)
+            {
+                _logger.LogInformation("No active dotnet-counter to disable.");
+                return false;
+            }
+
             if (_eventPipeSession is not null)
             {
                 await _eventPipeSession.StopAsync(cancellationToken);
-                return true;
+                foreach (var sink in _outputSinks)
+                {
+                    try
+                    {
+
+                        await sink.FlushAsync(cancellationToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "Error flushing sink of {sinkType}", sink.GetType());
+                    }
+                }
+                _logger.LogInformation("dotnet-counters disabled...");
+
             }
+            _isEnabled = false;
+            return true;
         }
         catch (EndOfStreamException ex)
         {
@@ -80,45 +111,59 @@ public sealed class DotNetCountersClient : IDotNetCountersClient, IAsyncDisposab
         }
         finally
         {
+            _lock.Release();
             await DisposeCoreAsync().ConfigureAwait(false);
         }
         return false;
     }
 
-    public Task<bool> EnableAsync(CancellationToken cancellationToken)
+    public async Task<bool> EnableAsync(CancellationToken cancellationToken)
     {
-        if (cancellationToken.IsCancellationRequested)
+        _logger.LogInformation("Enabling dotnet-counters...");
+        await _lock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            return Task.FromCanceled<bool>(cancellationToken);
+            if (_isEnabled)
+            {
+                _logger.LogInformation("There is already a running dotnet-counter.");
+                return false;
+            }
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    _outputStream = new MemoryStream();
+                    _eventPipeSession = _diagnosticsClient.StartEventPipeSession(GetEventPipeProviders(), requestRundown: false, circularBufferMB: 10);
+                    _diagnosticsClient.ResumeRuntime();
+                    _eventPipeEventSource = new EventPipeEventSource(_eventPipeSession.EventStream);
+                    _eventPipeEventSource.Dynamic.All += DynamicAllMonitor;
+                    _eventPipeEventSource.Process();
+                    _logger.LogInformation("dotnet-counters enabled.");
+                }
+                catch (DiagnosticsClientException ex)
+                {
+                    _logger.LogError(ex, "Failed to start the counter session: {message}", ex.ToString());
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Unknown error: {message}", ex.ToString());
+                }
+            }, cancellationToken);
+            _isEnabled = true;
+            return true;
         }
-
-        _ = Task.Run(() =>
+        finally
         {
-            try
-            {
-                _outputStream = new MemoryStream();
-                _eventPipeSession = _diagnosticsClient.StartEventPipeSession(GetEventPipeProviders(), requestRundown: false, circularBufferMB: 10);
-                _diagnosticsClient.ResumeRuntime();
-                _eventPipeEventSource = new EventPipeEventSource(_eventPipeSession.EventStream);
-                _eventPipeEventSource.Dynamic.All += DynamicAllMonitor;
-                _eventPipeEventSource.Process();
-            }
-            catch (DiagnosticsClientException ex)
-            {
-                _logger.LogError(ex, "Failed to start the counter session: {message}", ex.ToString());
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Unknown error: {message}", ex.ToString());
-            }
-        }, cancellationToken);
-
-        return Task.FromResult(true);
+            _lock.Release();
+        }
     }
 
-    private async void DynamicAllMonitor(TraceEvent traceEventObject)
+    private void DynamicAllMonitor(TraceEvent traceEventObject)
     {
-        _logger.LogDebug("Get trace event object: {name}", traceEventObject.EventName);
+        if (_logger.IsEnabled(LogLevel.Trace))
+        {
+            _logger.LogTrace("Get trace event object: {name}", traceEventObject.EventName);
+        }
 
         if (traceEventObject.EventName.Equals("EventCounters", StringComparison.Ordinal))
         {
@@ -142,7 +187,7 @@ public sealed class DotNetCountersClient : IDotNetCountersClient, IAsyncDisposab
             }
 
             // Write to sinks
-            foreach (ISink<DotNetCountersClient, ICounterPayload> sink in _outputSinks)
+            foreach (ISink<IDotNetCountersClient, ICounterPayload> sink in _outputSinks)
             {
                 // TODO: Extend this to support json writer.
                 // Writer header
@@ -176,6 +221,7 @@ public sealed class DotNetCountersClient : IDotNetCountersClient, IAsyncDisposab
     {
         await DisableAsync(cancellationToken: default);
         await DisposeCoreAsync();
+        _lock.Dispose();
     }
 
     private async ValueTask DisposeCoreAsync()
@@ -191,5 +237,6 @@ public sealed class DotNetCountersClient : IDotNetCountersClient, IAsyncDisposab
             await _outputStream.DisposeAsync().ConfigureAwait(false);
         }
         _outputStream = null;
+
     }
 }

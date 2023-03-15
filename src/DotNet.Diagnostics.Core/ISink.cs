@@ -2,6 +2,7 @@ namespace DotNet.Diagnostics.Core;
 
 public interface ISink<TSource, TData>
 {
-    
-    void Submit(TData data);
+    bool Submit(TData data);
+
+    Task FlushAsync(CancellationToken cancellationToken);
 }
