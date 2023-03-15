@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
@@ -8,16 +9,16 @@ namespace DotNet.Diagnostics.Counters.WebHooks;
 public class DotNetCounterMiddleware
 {
     private readonly RequestDelegate _next;
-    private readonly DotNetCountersWebhookOptions _healthCheckOptions;
+    private readonly DotNetCountersWebhookOptions _options;
     private readonly IDotNetCountersClient _dotnetCountersClient;
     private readonly JsonSerializerOptions _jsonSerializationOptions;
 
     public DotNetCounterMiddleware(RequestDelegate next,
-        IOptions<DotNetCountersWebhookOptions> healthCheckOptions,
+        IOptions<DotNetCountersWebhookOptions> dotnetCountersWebhookOptions,
         IDotNetCountersClient dotnetCountersClient)
     {
         _next = next;
-        _healthCheckOptions = healthCheckOptions?.Value ?? throw new ArgumentNullException(nameof(healthCheckOptions));
+        _options = dotnetCountersWebhookOptions?.Value ?? throw new ArgumentNullException(nameof(dotnetCountersWebhookOptions));
         _dotnetCountersClient = dotnetCountersClient ?? throw new ArgumentNullException(nameof(dotnetCountersClient));
         _jsonSerializationOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
     }
@@ -33,12 +34,19 @@ public class DotNetCounterMiddleware
         }
 
         CancellationToken cancellationToken = httpContext.RequestAborted;
-
         RequestBodyContract? body = await JsonSerializer.DeserializeAsync<RequestBodyContract>(httpContext.Request.Body, _jsonSerializationOptions, cancellationToken).ConfigureAwait(false);
-
         if (body is null)
         {
             throw new InvalidOperationException("Request body is invalid.");
+        }
+
+        if (!string.IsNullOrEmpty(_options.InvokingSecret) && !string.Equals(body.InvokingSecret, _options.InvokingSecret))
+        {
+            httpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+            logger?.LogError("Invalid invoking secret: {key}", body.InvokingSecret);
+            
+            await httpContext.Response.WriteAsJsonAsync( new RequestError(){StatusCode = (int)HttpStatusCode.Forbidden, Message = "Unauthorized access. Invalid invoking secret."}, cancellationToken);
+            return;
         }
 
         if (body.IsEnabled)
