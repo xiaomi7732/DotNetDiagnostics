@@ -1,26 +1,12 @@
 # Welcome to Open DotNET Diagnostics
 
-Our vision:
-
 Integrate .NET diagnostics tools into your code and seamlessly deliver results to multiple destinations.
 
 ![Vision for the project](./src/../images/IssuesToSolve.png)
 
-We aim to alleviate the following **pain points**:
-
-1. You no longer need to deliver dotnet diagnostic tool binaries such as dotnet-counters, dotnet-trace, or dotnet-gcdump to your environment..
-   1. Some environments, such as containers, make it inconvenient to add additional binaries, while others, like Azure App Service/WebSite, are sandboxed and unable to run .NET tools.
-   2. With our solution, you can enjoy a consistent experience whether you are diagnosing issues locally or remotely.
-
-2. You no longer need to export diagnostic data, such as `dotnet-counter` output, from a constrained environment.
-    1. By adding proper sinks, you can easily access these files through Kudu or Azure Blob Storage and so on.
-    2. Your data will persist externally even if your machine or containers are recycled.
-
-3. With our solution, you can write once and run everywhere, including locally, on Azure WebSite, in containers, or on AKS, with a unified experience.
-
 _Please note that while this repository is open source, it is not a Microsoft/dotnet repository. We welcome contributions from anyone interested in improving our solution._
 
-Our approach places a stronger emphasis on the developer experience, and thus requires a reasonable amount of code instrumentation. If you prefer an operational approach that requires no code changes, we recommend checking out the official [dotnet-monitor](https://github.com/dotnet/dotnet-monitor) repository.
+Our approach prioritizes the developer experience and therefore requires some code instrumentation, typically just a few lines. If you prefer an operational approach that doesn't require any code changes, we recommend checking out the official [dotnet-monitor](https://github.com/dotnet/dotnet-monitor) repository.
 
 ## Get Started (dotnet-counters)
 
@@ -76,6 +62,21 @@ Assuming you have an ASP.NET Core WebAPI project:
     ![Analysis example in excel for working set](./images/DotNetCounterWorkingSetExample.png)
 
     What we see: it is a pretty small amount of `working set` used over the period, yet we could still see dips, probably GC?
+
+## Vision
+
+We aim to alleviate the following **pain points**:
+
+1. You no longer need to deliver dotnet diagnostic tool binaries such as dotnet-counters, dotnet-trace, or dotnet-gcdump to your environment..
+   1. Some environments, such as containers, make it inconvenient to add additional binaries, while others, like Azure App Service/WebSite, are sandboxed and unable to run .NET tools.
+   2. With our solution, you can enjoy a consistent experience whether you are diagnosing issues locally or remotely.
+
+2. You no longer need to export diagnostic data, such as `dotnet-counter` output, from a constrained environment.
+    1. By adding proper sinks, you can easily access these files through Kudu or Azure Blob Storage and so on.
+    2. Your data will persist externally even if your machine or containers are recycled.
+
+3. With our solution, you can write once and run everywhere, including locally, on Azure WebSite, in containers, or on AKS, with a unified experience.
+
 
 ## Road map
 
