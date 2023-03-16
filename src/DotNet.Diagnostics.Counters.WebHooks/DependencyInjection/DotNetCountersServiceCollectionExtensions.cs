@@ -1,4 +1,3 @@
-using DotNet.Diagnostics.Core;
 using DotNet.Diagnostics.Counters;
 using DotNet.Diagnostics.Counters.WebHooks;
 using Microsoft.Extensions.Configuration;
