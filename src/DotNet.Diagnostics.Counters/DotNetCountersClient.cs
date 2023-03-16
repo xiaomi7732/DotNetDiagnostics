@@ -1,6 +1,4 @@
 using System.Diagnostics;
-using System.Diagnostics.Tracing;
-using System.Globalization;
 using DotNet.Diagnostics.Core;
 using Microsoft.Diagnostics.NETCore.Client;
 using Microsoft.Diagnostics.Tracing;
@@ -19,18 +17,21 @@ public sealed class DotNetCountersClient : IDotNetCountersClient, IAsyncDisposab
     private Stream? _outputStream;
     private readonly DotNetCountersOptions _options;
     private readonly IEnumerable<ISink<IDotNetCountersClient, ICounterPayload>> _outputSinks;
+    private readonly DotNetCountEventCounterManager _eventCounterManager;
     private readonly ILogger _logger;
 
     public DotNetCountersClient(
         IEnumerable<ISink<IDotNetCountersClient, ICounterPayload>>? outputSinks,
+        DotNetCountEventCounterManager eventCounterManager,
         IOptions<DotNetCountersOptions> options,
         ILogger<DotNetCountersClient> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
 
-        _outputSinks = outputSinks ?? Enumerable.Empty<ISink<IDotNetCountersClient, ICounterPayload>>();
+        _eventCounterManager = eventCounterManager ?? throw new ArgumentNullException(nameof(eventCounterManager));
 
+        _outputSinks = outputSinks ?? Enumerable.Empty<ISink<IDotNetCountersClient, ICounterPayload>>();
         if (!_outputSinks.Any())
         {
             _logger.LogWarning("There's no output sink.");
@@ -137,8 +138,8 @@ public sealed class DotNetCountersClient : IDotNetCountersClient, IAsyncDisposab
                     _diagnosticsClient.ResumeRuntime();
                     _eventPipeEventSource = new EventPipeEventSource(_eventPipeSession.EventStream);
                     _eventPipeEventSource.Dynamic.All += DynamicAllMonitor;
-                    _eventPipeEventSource.Process();
                     _logger.LogInformation("dotnet-counters enabled.");
+                    _eventPipeEventSource.Process();
                 }
                 catch (DiagnosticsClientException ex)
                 {
@@ -169,7 +170,13 @@ public sealed class DotNetCountersClient : IDotNetCountersClient, IAsyncDisposab
         {
             IDictionary<string, object> payloadVal = (IDictionary<string, object>)(traceEventObject.PayloadValue(0));
             IDictionary<string, object> payloadFields = (IDictionary<string, object>)(payloadVal["Payload"]);
-            dynamic y = payloadVal["Payload"];
+
+            string? metricsName = payloadFields["Name"].ToString();
+            if(string.IsNullOrEmpty(metricsName) || !IsEnabled(traceEventObject.ProviderName, metricsName))
+            {
+                // The metrics doesn't have a name or it is not there in the filter.
+                return;
+            }
 
             ICounterPayload payload;
             if (CounterPayload.TryParse(payloadFields, traceEventObject, out CounterPayload? counterPayload))
@@ -203,25 +210,31 @@ public sealed class DotNetCountersClient : IDotNetCountersClient, IAsyncDisposab
         }
     }
 
-    private IEnumerable<EventPipeProvider> GetEventPipeProviders()
-    {
-        string intervalInSecondsString = _options.IntervalSec.ToString(CultureInfo.InvariantCulture);
-
-        yield return new EventPipeProvider("System.Runtime", EventLevel.Verbose, 0xffffffff, new Dictionary<string, string>
-        {
-            ["EventCounterIntervalSec"] = intervalInSecondsString,
-        });
-        yield return new EventPipeProvider("Microsoft.AspNetCore.Hosting", EventLevel.Informational, 0x0, new Dictionary<string, string>
-        {
-            ["EventCounterIntervalSec"] = intervalInSecondsString,
-        });
-    }
+    private IEnumerable<EventPipeProvider> GetEventPipeProviders() 
+        => _eventCounterManager.EventCounters.Select(item => item.ToEventPipeProvider()).OfType<EventPipeProvider>();
 
     public async ValueTask DisposeAsync()
     {
         await DisableAsync(cancellationToken: default);
         await DisposeCoreAsync();
         _lock.Dispose();
+    }
+
+    private bool IsEnabled(string providerName, string metricsName)
+    {
+        if(string.IsNullOrEmpty(providerName))
+        {
+            _logger.LogError("How can provider name be null for event pipe events?");
+            return false;
+        }
+
+        if(string.IsNullOrEmpty(metricsName))
+        {
+            _logger.LogError("How can metrics name be null for event counter events?");
+            return false;
+        }
+
+        return _eventCounterManager.IsEnabled(providerName, metricsName);
     }
 
     private async ValueTask DisposeCoreAsync()

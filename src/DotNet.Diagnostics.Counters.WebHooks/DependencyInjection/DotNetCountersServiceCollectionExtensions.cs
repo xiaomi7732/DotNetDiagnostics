@@ -23,6 +23,7 @@ public static class DotNetCountersServiceCollectionExtensions
         string webHookConfigurationSectionName = "DotNetCountersWebHook",
         string dotnetCountersClientConfigurationSectionName = "DotNetCounters")
     {
+        services.TryAddSingleton<DotNetCountEventCounterManager>();
         services.TryAddSingleton<IDotNetCountersClient, DotNetCountersClient>();
         services.AddOptions<DotNetCountersWebhookOptions>().Configure<IConfiguration>((opt, config) =>
         {
