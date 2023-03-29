@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Threading.Channels;
+using Azure;
 using Azure.Identity;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Specialized;
@@ -87,7 +88,14 @@ internal sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPaylo
 
         await foreach (ICounterPayload data in _workingQueue.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
-            await WriteDataAsync(data, cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await WriteDataAsync(data, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "An unexpected exception happened writing data. Some data might be missing. This could happen in case internet interrupted for local debugging. If you see this in production, please report an issue.");
+            }
         }
     }
 
