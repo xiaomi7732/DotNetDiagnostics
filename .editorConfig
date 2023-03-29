@@ -1,6 +1,14 @@
 # top-most EditorConfig file
 root = true
 
+[*]
+indent_style = space
+indent_size = 4
+end_of_line = crlf
+charset = utf-8
+trim_trailing_whitespace = false
+insert_final_newline = false
+
 [*.{cs,vb}]
 dotnet_naming_rule.private_members_with_underscore.symbols  = private_fields
 dotnet_naming_rule.private_members_with_underscore.style    = prefix_underscore
@@ -20,11 +28,3 @@ indent_size = 2
 
 [*.sh]
 end_of_line = lf
-
-[*]
-indent_style = space
-indent_size = 4
-end_of_line = crlf
-charset = utf-8
-trim_trailing_whitespace = false
-insert_final_newline = false
