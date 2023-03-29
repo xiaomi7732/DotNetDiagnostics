@@ -1,9 +1,12 @@
 using DotNet.Diagnostics.Core;
+using DotNet.Diagnostics.Counters;
+using DotNet.Diagnostics.Counters.Sinks;
+using DotNet.Diagnostics.Counters.Sinks.AzureBlob;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
-namespace DotNet.Diagnostics.Counters.Sinks.AzureBlob;
+namespace Microsoft.AspNetCore.Builder;
 
 public static class AzureBlobSinkServiceCollectionExtensions
 {

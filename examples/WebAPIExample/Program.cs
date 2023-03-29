@@ -4,7 +4,7 @@ builder.Services.AddLogging(loggingBuilder => loggingBuilder.AddSimpleConsole(op
     opt.SingleLine = true;
 }));
 builder.Services.AddDotNetCounters();
-builder.Services.AddDotNetCounterLocalFileSink();
+builder.Services.AddDotNetCounterAzureBlobSink();
 
 var app = builder.Build();
 app.MapGet("/", () => "Hello World!");

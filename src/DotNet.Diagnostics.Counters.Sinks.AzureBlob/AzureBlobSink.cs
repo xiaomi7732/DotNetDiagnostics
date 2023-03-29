@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Threading.Channels;
 using Azure.Identity;
 using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
 using DotNet.Diagnostics.Core;
 using Microsoft.Extensions.Logging;
@@ -18,6 +19,9 @@ internal sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPaylo
         SingleReader = true,
         SingleWriter = false,
     });
+
+    // This makes sure the flushing doesn't happen when the writer's writing the stream.
+    private SemaphoreSlim? _semaphoreSlim = new SemaphoreSlim(1, 1);
 
     private readonly AzureBlobSinkOptions _options;
     private readonly IPayloadWriter _payloadWriter;
@@ -44,6 +48,11 @@ internal sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPaylo
         }
         else
         {
+            if (_options.ServiceUri is null)
+            {
+                throw new InvalidOperationException("Connection string or ServiceUri can't both be null. Did you miss some configuration?");
+            }
+
             DefaultAzureCredentialOptions defaultAzureCredentialOptions = new DefaultAzureCredentialOptions()
             {
                 ManagedIdentityClientId = _options.ManagedIdentityClientId,
@@ -55,8 +64,21 @@ internal sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPaylo
         _blobContainerClient = blobServiceClient.GetBlobContainerClient(_options.ContainerName);
     }
 
-    public Task FlushAsync(CancellationToken cancellationToken)
-        => _currentStream?.Stream is null ? Task.CompletedTask : _currentStream.Value.Stream.FlushAsync(cancellationToken);
+    public async Task FlushAsync(CancellationToken cancellationToken)
+    {
+        await _semaphoreSlim!.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (_currentStream is not null)
+            {
+                await _currentStream.Value.Stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            _semaphoreSlim.Release();
+        }
+    }
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -72,37 +94,45 @@ internal sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPaylo
 
     private async Task WriteDataAsync(ICounterPayload data, CancellationToken cancellationToken)
     {
-        string blobName = GetBlobName(data.Timestamp);
-        AppendBlobClient blobClient = _blobContainerClient.GetAppendBlobClient(blobName);
-
-        // New
-        if (_currentStream is null)
+        await _semaphoreSlim!.WaitAsync(cancellationToken);
+        try
         {
-            _logger.LogInformation("Open writing: {blobName}", blobName);
-            _currentStream = (blobName, await blobClient.OpenWriteAsync(overwrite: false).ConfigureAwait(false));
-            await WriteHeaderAsync(_currentStream.Value.Stream, cancellationToken).ConfigureAwait(false);
-        }
+            string blobName = GetBlobName(data.Timestamp);
+            AppendBlobClient blobClient = _blobContainerClient.GetAppendBlobClient(blobName);
 
-        // Switch stream
-        if (!string.Equals(_currentStream.Value.Name, blobName, StringComparison.Ordinal))
-        {
-            try
+            // New
+            if (_currentStream is null)
             {
-                await _currentStream.Value.Stream.DisposeAsync();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Unexpected exception disposing last output: {blobName}. Data file might be corrupted.", _currentStream?.Name);
-            }
-            finally
-            {
-                _logger.LogInformation("Open new file for writing: {blobName}", blobName);
-                _currentStream = (blobName, await blobClient.OpenWriteAsync(overwrite: false).ConfigureAwait(false));
+                _logger.LogInformation("Open writing: {blobName}", blobName);
+                _currentStream = (blobName, await blobClient.OpenWriteAsync(overwrite: false, cancellationToken: cancellationToken).ConfigureAwait(false));
                 await WriteHeaderAsync(_currentStream.Value.Stream, cancellationToken).ConfigureAwait(false);
             }
-        }
 
-        await WriteDataAsync(_currentStream.Value.Stream, data, cancellationToken).ConfigureAwait(false);
+            // Switch stream
+            if (!string.Equals(_currentStream.Value.Name, blobName, StringComparison.Ordinal))
+            {
+                try
+                {
+                    await _currentStream.Value.Stream.DisposeAsync();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Unexpected exception disposing last output: {blobName}. Data file might be corrupted.", _currentStream?.Name);
+                }
+                finally
+                {
+                    _logger.LogInformation("Open new file for writing: {blobName}", blobName);
+                    _currentStream = (blobName, await blobClient.OpenWriteAsync(overwrite: false, cancellationToken: cancellationToken).ConfigureAwait(false));
+                    await WriteHeaderAsync(_currentStream.Value.Stream, cancellationToken).ConfigureAwait(false);
+                }
+            }
+
+            await WriteDataAsync(_currentStream.Value.Stream, data, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _semaphoreSlim.Release();
+        }
     }
 
     private Task WriteDataAsync(Stream stream, ICounterPayload data, CancellationToken cancellationToken)
@@ -120,7 +150,13 @@ internal sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPaylo
     private string GetBlobName(DateTime timestamp)
     {
         const string fileExtension = ".csv";
-        string prefix = string.Join("_", (object)_options.FileNamePrefix, _webAppContext.SiteInstanceId, timestamp.ToString("yyyyMMddHH", CultureInfo.InvariantCulture));
+
+        string fileName = _options.FileNamePrefix;
+
+        string machineId = string.IsNullOrEmpty(_webAppContext.SiteInstanceId) ? Environment.MachineName : _webAppContext.SiteInstanceId;
+
+        string prefix = string.Join("_", (object)_options.FileNamePrefix, machineId, timestamp.ToString("yyyyMMddHH", CultureInfo.InvariantCulture)).Trim('_');
+
         string blobName = prefix + fileExtension;
         return blobName;
     }
@@ -142,5 +178,8 @@ internal sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPaylo
             await _currentStream.Value.Stream.DisposeAsync();
             _currentStream = null;
         }
+
+        _semaphoreSlim?.Dispose();
+        _semaphoreSlim = null;
     }
 }
