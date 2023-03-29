@@ -2,7 +2,6 @@ using System.Globalization;
 using System.Threading.Channels;
 using Azure.Identity;
 using Azure.Storage.Blobs;
-using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
 using DotNet.Diagnostics.Core;
 using Microsoft.Extensions.Logging;
