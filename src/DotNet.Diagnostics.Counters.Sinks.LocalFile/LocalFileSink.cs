@@ -40,7 +40,7 @@ internal sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPaylo
         return success;
     }
 
-    public async Task Start(CancellationToken cancellationToken)
+    public async Task StartAsync(CancellationToken cancellationToken)
     {
         await foreach (ICounterPayload data in _workingQueue.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {

@@ -1,11 +1,11 @@
 // Copied from https://github.com/dotnet/extensions/blob/3dc5e9a24865ab84fce6fc078fce4bd7cfcab5c7/src/Logging/Logging.AzureAppServices/src/WebAppContext.cs
 
-namespace DotNet.Diagnostics.Counters.Sinks.LocalFile;
+namespace DotNet.Diagnostics.Core;
 
 /// <summary>
 /// Represents the default implementation of <see cref="IWebAppContext"/>.
 /// </summary>
-internal sealed class WebAppContext
+public sealed class WebAppContext
 {
     /// <summary>
     /// Gets the default instance of the WebApp context.

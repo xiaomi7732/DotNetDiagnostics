@@ -3,6 +3,7 @@ using DotNet.Diagnostics.Counters;
 using DotNet.Diagnostics.Counters.Sinks.LocalFile;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Microsoft.AspNetCore.Builder;
 
@@ -15,12 +16,12 @@ public static class LocalFileSinkServiceCollectionExtensions
             configure.GetSection(sectionName).Bind(opt);
         });
 
-        services.AddSingleton<WebAppContext>(_ => WebAppContext.Instance);
+        services.TryAddSingleton<WebAppContext>(_ => WebAppContext.Instance);
         services.AddSingleton<LoggingFileNameProvider>();
         services.AddSingleton<LocalFileSink>();
         services.AddSingleton<ISink<IDotNetCountersClient, ICounterPayload>>(p => p.GetRequiredService<LocalFileSink>());
         services.AddHostedService<LocalFileSinkBackgroundService>();
-        services.AddSingleton<IPayloadWriter, CSVPayloadWriter>();
+        services.TryAddSingleton<IPayloadWriter, CSVPayloadWriter>();
 
         return services;
     }

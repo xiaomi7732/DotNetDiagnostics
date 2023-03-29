@@ -1,12 +1,13 @@
 using Microsoft.Extensions.Hosting;
 
-namespace DotNet.Diagnostics.Counters.Sinks.LocalFile;
+namespace DotNet.Diagnostics.Core;
 
-internal class LocalFileSinkBackgroundService : BackgroundService
+public class SinkBackgroundService<T> : BackgroundService
+    where T : ISink
 {
-    private readonly LocalFileSink _sink;
+    private readonly T _sink;
 
-    public LocalFileSinkBackgroundService(LocalFileSink sink)
+    public SinkBackgroundService(T sink)
     {
         _sink = sink ?? throw new ArgumentNullException(nameof(sink));
     }

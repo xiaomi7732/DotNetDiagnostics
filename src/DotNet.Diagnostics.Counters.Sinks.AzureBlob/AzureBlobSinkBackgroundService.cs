@@ -1,12 +1,12 @@
 using Microsoft.Extensions.Hosting;
 
-namespace DotNet.Diagnostics.Counters.Sinks.LocalFile;
+namespace DotNet.Diagnostics.Counters.Sinks.AzureBlob;
 
-internal class LocalFileSinkBackgroundService : BackgroundService
+internal class AzureBlobSinkBackgroundService : BackgroundService
 {
-    private readonly LocalFileSink _sink;
+    private readonly AzureBlobSink _sink;
 
-    public LocalFileSinkBackgroundService(LocalFileSink sink)
+    public AzureBlobSinkBackgroundService(AzureBlobSink sink)
     {
         _sink = sink ?? throw new ArgumentNullException(nameof(sink));
     }

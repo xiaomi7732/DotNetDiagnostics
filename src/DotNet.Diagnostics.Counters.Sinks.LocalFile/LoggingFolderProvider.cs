@@ -1,3 +1,4 @@
+using DotNet.Diagnostics.Core;
 using Microsoft.Extensions.Options;
 
 namespace DotNet.Diagnostics.Counters.Sinks.LocalFile;
