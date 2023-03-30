@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Threading.Channels;
-using Azure;
 using Azure.Identity;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Specialized;
@@ -13,6 +12,10 @@ namespace DotNet.Diagnostics.Counters.Sinks.AzureBlob;
 internal sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload>, IAsyncDisposable
 {
     private (string Name, Stream Stream)? _currentStream = null;
+
+    // This is a simple protection when exception got thrown while writing data, and message kept pushing into the queue and causing
+    // endless exception handling.
+    private bool _stopWriting = false;
 
     private readonly Channel<ICounterPayload> _workingQueue = Channel.CreateUnbounded<ICounterPayload>(new UnboundedChannelOptions()
     {
@@ -86,16 +89,52 @@ internal sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPaylo
         await _blobContainerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
         _logger.LogInformation("Blob container exists.");
 
-        await foreach (ICounterPayload data in _workingQueue.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        while (!cancellationToken.IsCancellationRequested)
         {
             try
             {
-                await WriteDataAsync(data, cancellationToken).ConfigureAwait(false);
+                await StartReadingQueueAsync(cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                _logger.LogDebug(ex, "An unexpected exception happened writing data. Some data might be missing. This could happen in case internet interrupted for local debugging. If you see this in production, please report an issue.");
+                try
+                {
+                    _logger.LogDebug(ex, "An unexpected exception happened writing data. Some data might be missing. This could happen in case internet interrupted for local debugging. If you see this in production, please report an issue.");
+
+                    if (_currentStream?.Stream is not null)
+                    {
+                        // Clean up _currentStream for a clean restart.
+                        try
+                        {
+                            Stream? lastStream = _currentStream?.Stream;
+                            _currentStream = null;
+                            if (lastStream is not null)
+                            {
+                                await lastStream.DisposeAsync().ConfigureAwait(false);
+                            }
+                        }
+                        catch (Exception stillEx)
+                        {
+                            // Best effort.
+                            _logger.LogDebug(stillEx, "Unfortunate exception.");
+                        }
+                    }
+                }
+                finally
+                {
+                    _currentStream = null;
+                    _stopWriting = false;
+                }
             }
+        }
+
+    }
+
+    private async Task StartReadingQueueAsync(CancellationToken cancellationToken)
+    {
+        await foreach (ICounterPayload data in _workingQueue.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        {
+            await WriteDataAsync(data, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -107,12 +146,13 @@ internal sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPaylo
             string blobName = GetBlobName(data.Timestamp);
             AppendBlobClient blobClient = _blobContainerClient.GetAppendBlobClient(blobName);
 
+            bool isNew = !(await blobClient.ExistsAsync(cancellationToken));
+
             // New
             if (_currentStream is null)
             {
                 _logger.LogInformation("Open writing: {blobName}", blobName);
                 _currentStream = (blobName, await blobClient.OpenWriteAsync(overwrite: false, cancellationToken: cancellationToken).ConfigureAwait(false));
-                await WriteHeaderAsync(_currentStream.Value.Stream, cancellationToken).ConfigureAwait(false);
             }
 
             // Switch stream
@@ -120,21 +160,26 @@ internal sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPaylo
             {
                 try
                 {
-                    await _currentStream.Value.Stream.DisposeAsync();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Unexpected exception disposing last output: {blobName}. Data file might be corrupted.", _currentStream?.Name);
+                    await _currentStream.Value.Stream.DisposeAsync().ConfigureAwait(false);
                 }
                 finally
                 {
                     _logger.LogInformation("Open new file for writing: {blobName}", blobName);
                     _currentStream = (blobName, await blobClient.OpenWriteAsync(overwrite: false, cancellationToken: cancellationToken).ConfigureAwait(false));
-                    await WriteHeaderAsync(_currentStream.Value.Stream, cancellationToken).ConfigureAwait(false);
                 }
             }
 
+            if (isNew)
+            {
+                await WriteHeaderAsync(_currentStream.Value.Stream, cancellationToken).ConfigureAwait(false);
+            }
             await WriteDataAsync(_currentStream.Value.Stream, data, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Unexpected exception disposing last output: {blobName}. Data file might be corrupted.", _currentStream?.Name);
+            _stopWriting = true;
+            throw;
         }
         finally
         {
@@ -170,6 +215,12 @@ internal sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPaylo
 
     public bool Submit(ICounterPayload data)
     {
+        if (_stopWriting)
+        {
+            _logger.LogDebug("Submitting skipped.");
+            return false;
+        }
+
         bool success = _workingQueue.Writer.TryWrite(data);
         if (_logger.IsEnabled(LogLevel.Trace))
         {
