@@ -240,7 +240,8 @@ internal sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPaylo
     {
         if (_currentStream?.Stream is not null)
         {
-            await _currentStream.Value.Stream.DisposeAsync();
+            _logger.LogDebug("Disposing current stream...");
+            await _currentStream.Value.Stream.DisposeAsync().ConfigureAwait(false);
             _currentStream = null;
         }
 
