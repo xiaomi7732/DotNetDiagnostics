@@ -30,11 +30,11 @@ internal class LoggingFileNameProvider
 
         if (_webAppContext.IsRunningInAzureWebApp && !_options.ForceCustomFilePathInAzureAppService)
         {
-            return $"{_options.FileNamePrefix}_{_webAppContext.SiteInstanceId}_{timestamp.ToString("yyyyMMddHH")}{fileExtension}";
+            return $"{_options.FileNamePrefix}_{_webAppContext.SiteInstanceId}_{timestamp.ToUniversalTime().ToString("yyyyMMddHH")}{fileExtension}";
         }
         else
         {
-            return $"{_options.FileNamePrefix}_{DateTime.UtcNow.ToString("yyyyMMddHH")}{fileExtension}";
+            return $"{_options.FileNamePrefix}_{timestamp.ToUniversalTime().ToString("yyyyMMddHH")}{fileExtension}";
         }
     }
 

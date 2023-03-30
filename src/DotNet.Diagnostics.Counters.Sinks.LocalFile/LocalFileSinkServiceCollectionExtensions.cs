@@ -20,7 +20,7 @@ public static class LocalFileSinkServiceCollectionExtensions
         services.AddSingleton<LoggingFileNameProvider>();
         services.AddSingleton<LocalFileSink>();
         services.AddSingleton<ISink<IDotNetCountersClient, ICounterPayload>>(p => p.GetRequiredService<LocalFileSink>());
-        services.AddHostedService<LocalFileSinkBackgroundService>();
+        services.AddHostedService<SinkBackgroundService<LocalFileSink>>();
         services.TryAddSingleton<IPayloadWriter, CSVPayloadWriter>();
 
         return services;

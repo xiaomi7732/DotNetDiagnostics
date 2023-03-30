@@ -95,6 +95,10 @@ internal sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPaylo
             {
                 await StartReadingQueueAsync(cancellationToken).ConfigureAwait(false);
             }
+            catch (OperationCanceledException cancel) when (cancel.CancellationToken == cancellationToken)
+            {
+                _logger.LogDebug("Task cancelled. Gracefully shutting down.");
+            }
             catch (Exception ex)
             {
                 try
@@ -127,7 +131,6 @@ internal sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPaylo
                 }
             }
         }
-
     }
 
     private async Task StartReadingQueueAsync(CancellationToken cancellationToken)
@@ -175,6 +178,10 @@ internal sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPaylo
             }
             await WriteDataAsync(_currentStream.Value.Stream, data, cancellationToken).ConfigureAwait(false);
         }
+        catch (OperationCanceledException cancel) when (cancel.CancellationToken == cancellationToken)
+        {
+            _logger.LogDebug("Writing data operation canceled by the user.");
+        }
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Unexpected exception disposing last output: {blobName}. Data file might be corrupted.", _currentStream?.Name);
@@ -207,7 +214,7 @@ internal sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPaylo
 
         string machineId = string.IsNullOrEmpty(_webAppContext.SiteInstanceId) ? Environment.MachineName : _webAppContext.SiteInstanceId;
 
-        string prefix = string.Join("_", (object)_options.FileNamePrefix, machineId, timestamp.ToString("yyyyMMddHH", CultureInfo.InvariantCulture)).Trim('_');
+        string prefix = string.Join("_", (object)_options.FileNamePrefix, machineId, timestamp.ToUniversalTime().ToString("yyyyMMddHH", CultureInfo.InvariantCulture)).Trim('_');
 
         string blobName = prefix + fileExtension;
         return blobName;

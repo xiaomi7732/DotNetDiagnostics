@@ -19,7 +19,7 @@ public static class AzureBlobSinkServiceCollectionExtensions
 
         services.TryAddSingleton<WebAppContext>(_ => WebAppContext.Instance);
         services.TryAddSingleton<AzureBlobSink>();
-        services.TryAddSingleton<ISink<IDotNetCountersClient, ICounterPayload>>( p => p.GetRequiredService<AzureBlobSink>());
+        services.AddSingleton<ISink<IDotNetCountersClient, ICounterPayload>>(p => p.GetRequiredService<AzureBlobSink>());
         services.AddHostedService<SinkBackgroundService<AzureBlobSink>>();
         services.TryAddSingleton<IPayloadWriter, CSVPayloadWriter>();
 
