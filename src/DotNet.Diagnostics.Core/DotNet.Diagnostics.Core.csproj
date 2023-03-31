@@ -5,7 +5,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <PackageId>DotNet.Diagnostics.Core</PackageId>
+    <PackageId>OpenDotNetDiagnostics.Core</PackageId>
   </PropertyGroup>
 
   <ItemGroup>

@@ -4,7 +4,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <PackageId>DotNet.Diagnostics.Counters.Sinks.AzureBlob</PackageId>
+    <PackageId>OpenDotNetDiagnostics.Counters.Sinks.AzureBlob</PackageId>
   </PropertyGroup>
   
   <ItemGroup>
