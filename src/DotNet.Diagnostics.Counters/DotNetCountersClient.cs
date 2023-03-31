@@ -74,7 +74,6 @@ public sealed class DotNetCountersClient : IDotNetCountersClient, IAsyncDisposab
                 {
                     try
                     {
-
                         await sink.FlushAsync(cancellationToken);
                     }
                     catch (Exception ex)

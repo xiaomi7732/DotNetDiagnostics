@@ -84,3 +84,13 @@ We aim to alleviate the following **pain points**:
 1. Update to support more complex environments - scaled out multiple instances.
 1. Support triggers - that automatically starts the diagnostic tools.
 1. Add guidance for extending sinks.
+
+## Development Progress
+
+There are quite a few to crewing through. Please contact if want to contribute.
+
+| DotNet Tools | Local Environment | Azure App Service | Container | Remarks |
+|-|-|-|-|-|
+|[dotnet-counters](https://github.com/dotnet/diagnostics/blob/main/documentation/dotnet-counters-instructions.md)|DotNet.Diagnostics.Counters.WebHooks +<br /> DotNet.Diagnostics.Counters.Sinks.LocalFile | Diagnostics.Counters.WebHooks +<br /> DotNet.Diagnostics.Counters.Sinks.LocalFile or DotNet.Diagnostics.Counters.Sinks.AzureBlob  | Diagnostics.Counters.WebHooks +<br /> DotNet.Diagnostics.Counters.Sinks.AzureBlob| MVP |
+|[dotnet-gcdump](https://github.com/dotnet/diagnostics/blob/main/documentation/dotnet-gcdump-instructions.md)| Planning | Planning| Planning| Coming next |
+|[dotnet-trace](https://github.com/dotnet/diagnostics/blob/main/documentation/dotnet-trace-instructions.md)| Planning | Planning | Planning | Backlog |

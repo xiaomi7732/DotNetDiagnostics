@@ -40,7 +40,7 @@ internal sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPaylo
         return success;
     }
 
-    public async Task Start(CancellationToken cancellationToken)
+    public async Task StartAsync(CancellationToken cancellationToken)
     {
         await foreach (ICounterPayload data in _workingQueue.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
@@ -110,6 +110,13 @@ internal sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPaylo
 
     public async ValueTask DisposeAsync()
     {
+        _logger.LogInformation("Flush the buffer and send data to storage...");
+
+        if (_workingQueue.Writer.TryComplete())
+        {
+            await _workingQueue.Reader.Completion;
+        }
+
         if (_currentStream is not null)
         {
             await _currentStream.DisposeAsync();
