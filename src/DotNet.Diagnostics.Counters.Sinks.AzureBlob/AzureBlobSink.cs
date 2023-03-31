@@ -11,11 +11,9 @@ namespace DotNet.Diagnostics.Counters.Sinks.AzureBlob;
 
 internal sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload>, IAsyncDisposable
 {
-    private (string Name, Stream Stream)? _currentStream = null;
-
-    // This is a simple protection when exception got thrown while writing data, and message kept pushing into the queue and causing
-    // endless exception handling.
-    private bool _stopWriting = false;
+    private bool _isDisposed = false;
+    private readonly Dictionary<string, MemoryStream> _cache = new Dictionary<string, MemoryStream>(StringComparer.Ordinal);
+    private string? _currentStreamKey = null;
 
     private readonly Channel<ICounterPayload> _workingQueue = Channel.CreateUnbounded<ICounterPayload>(new UnboundedChannelOptions()
     {
@@ -63,19 +61,23 @@ internal sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPaylo
             };
             blobServiceClient = new BlobServiceClient(_options.ServiceUri, new DefaultAzureCredential());
         }
-
         _blobContainerClient = blobServiceClient.GetBlobContainerClient(_options.ContainerName);
     }
 
     public async Task FlushAsync(CancellationToken cancellationToken)
     {
-        await _semaphoreSlim!.WaitAsync(cancellationToken).ConfigureAwait(false);
+        if (_isDisposed || _semaphoreSlim is null)
+        {
+            return;
+        }
+
+        _logger.LogDebug("Acquiring semaphore for flushing.");
+        await _semaphoreSlim!.WaitAsync().ConfigureAwait(false);
+        _logger.LogDebug("Acquired semaphore for flushing.");
         try
         {
-            if (_currentStream is not null)
-            {
-                await _currentStream.Value.Stream.FlushAsync(cancellationToken).ConfigureAwait(false);
-            }
+            await AppendBlobAsync().ConfigureAwait(false);
+
         }
         finally
         {
@@ -93,104 +95,143 @@ internal sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPaylo
         {
             try
             {
-                await StartReadingQueueAsync(cancellationToken).ConfigureAwait(false);
+                await StartReadingQueueAsync().ConfigureAwait(false);
             }
             catch (OperationCanceledException cancel) when (cancel.CancellationToken == cancellationToken)
             {
                 _logger.LogDebug("Task cancelled. Gracefully shutting down.");
-            }
-            catch (Exception ex)
-            {
-                try
-                {
-                    _logger.LogDebug(ex, "An unexpected exception happened writing data. Some data might be missing. This could happen in case internet interrupted for local debugging. If you see this in production, please report an issue.");
-
-                    if (_currentStream?.Stream is not null)
-                    {
-                        // Clean up _currentStream for a clean restart.
-                        try
-                        {
-                            Stream? lastStream = _currentStream?.Stream;
-                            _currentStream = null;
-                            if (lastStream is not null)
-                            {
-                                await lastStream.DisposeAsync().ConfigureAwait(false);
-                            }
-                        }
-                        catch (Exception stillEx)
-                        {
-                            // Best effort.
-                            _logger.LogDebug(stillEx, "Unfortunate exception.");
-                        }
-                    }
-                }
-                finally
-                {
-                    _currentStream = null;
-                    _stopWriting = false;
-                }
+                await FlushAsync(cancellationToken: default).ConfigureAwait(false);
+                _logger.LogDebug("Working queue writer stopped.");
+                throw;
             }
         }
     }
 
-    private async Task StartReadingQueueAsync(CancellationToken cancellationToken)
+    private async Task StartReadingQueueAsync()
     {
-        await foreach (ICounterPayload data in _workingQueue.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        await foreach (ICounterPayload data in _workingQueue.Reader.ReadAllAsync(default).ConfigureAwait(false))
         {
-            await WriteDataAsync(data, cancellationToken).ConfigureAwait(false);
+            await WriteDataAsync(data, default).ConfigureAwait(false);
         }
     }
 
     private async Task WriteDataAsync(ICounterPayload data, CancellationToken cancellationToken)
     {
+        bool isTraceEnabled = _logger.IsEnabled(LogLevel.Trace);
+        if (isTraceEnabled)
+        {
+            _logger.LogTrace("Acquiring semaphore writing data...");
+        }
         await _semaphoreSlim!.WaitAsync(cancellationToken);
+        if (isTraceEnabled)
+        {
+            _logger.LogTrace("Acquired semaphore writing data...");
+        }
+
         try
         {
             string blobName = GetBlobName(data.Timestamp);
             AppendBlobClient blobClient = _blobContainerClient.GetAppendBlobClient(blobName);
 
-            bool isNew = !(await blobClient.ExistsAsync(cancellationToken));
+            // Check existing leads to a HEAD operation, keep it minimum.
+            bool isNew = string.IsNullOrEmpty(_currentStreamKey) && !(await blobClient.ExistsAsync(cancellationToken));
 
             // New
-            if (_currentStream is null)
+            if (!_cache.ContainsKey(blobName))
             {
                 _logger.LogInformation("Open writing: {blobName}", blobName);
-                _currentStream = (blobName, await blobClient.OpenWriteAsync(overwrite: false, cancellationToken: cancellationToken).ConfigureAwait(false));
+                _currentStreamKey = blobName;
+                _cache[_currentStreamKey] = new MemoryStream();
             }
 
-            // Switch stream
-            if (!string.Equals(_currentStream.Value.Name, blobName, StringComparison.Ordinal))
+            // Or switch stream
+            if (!string.IsNullOrEmpty(_currentStreamKey) && !string.Equals(_currentStreamKey, blobName, StringComparison.Ordinal))
             {
                 try
                 {
-                    await _currentStream.Value.Stream.DisposeAsync().ConfigureAwait(false);
+                    // Flush the cache before switching.
+                    await AppendBlobAsync().ConfigureAwait(false);
                 }
                 finally
                 {
                     _logger.LogInformation("Open new file for writing: {blobName}", blobName);
-                    _currentStream = (blobName, await blobClient.OpenWriteAsync(overwrite: false, cancellationToken: cancellationToken).ConfigureAwait(false));
+                    _currentStreamKey = blobName;
+                    _cache[blobName] = new MemoryStream();
                 }
             }
 
+            if (string.IsNullOrEmpty(_currentStreamKey))
+            {
+                return;
+            }
+
+            MemoryStream outputCache = _cache[_currentStreamKey];
             if (isNew)
             {
-                await WriteHeaderAsync(_currentStream.Value.Stream, cancellationToken).ConfigureAwait(false);
+                await WriteHeaderAsync(outputCache, cancellationToken).ConfigureAwait(false);
             }
-            await WriteDataAsync(_currentStream.Value.Stream, data, cancellationToken).ConfigureAwait(false);
+            await WriteDataAsync(outputCache, data, cancellationToken).ConfigureAwait(false);
+
+            // Persistent every once a while (100K in size)
+            if (outputCache.Length > 100 * 1024)
+            {
+                _logger.LogInformation("Persistent data to Azure Storage.");
+                await AppendBlobAsync(_currentStreamKey);
+            }
         }
         catch (OperationCanceledException cancel) when (cancel.CancellationToken == cancellationToken)
         {
             _logger.LogDebug("Writing data operation canceled by the user.");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug(ex, "Unexpected exception disposing last output: {blobName}. Data file might be corrupted.", _currentStream?.Name);
-            _stopWriting = true;
             throw;
         }
         finally
         {
             _semaphoreSlim.Release();
+        }
+    }
+
+    private async Task AppendBlobAsync()
+    {
+        string[] keys = _cache.Keys.ToArray();
+        foreach (string key in keys)
+        {
+            await AppendBlobAsync(key);
+        }
+    }
+
+    private async Task AppendBlobAsync(string cacheKey)
+    {
+        MemoryStream block = _cache[cacheKey];
+
+        int retry = 3;
+
+        while (retry-- >= 0)
+        {
+            try
+            {
+                AppendBlobClient blobClient = _blobContainerClient.GetAppendBlobClient(cacheKey);
+                block.Seek(0, SeekOrigin.Begin);
+                _logger.LogDebug("Appending {size} bytes of data to blob: {blobName}", block.Length, cacheKey);
+                await blobClient.CreateIfNotExistsAsync().ConfigureAwait(false);
+                await blobClient.AppendBlockAsync(block).ConfigureAwait(false);
+                await block.FlushAsync().ConfigureAwait(false);
+                await block.DisposeAsync().ConfigureAwait(false);
+                _cache.Remove(cacheKey);
+                return;
+            }
+            catch (Exception ex)
+            {
+                if (retry == 0)
+                {
+                    await block.DisposeAsync().ConfigureAwait(false);
+                    _cache.Remove(cacheKey);
+                    throw;
+                }
+
+                _logger.LogError(ex, "Failed persistent cache to Azure storage. Will retry.");
+                await Task.Delay(TimeSpan.FromSeconds(1));
+
+            }
         }
     }
 
@@ -222,12 +263,6 @@ internal sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPaylo
 
     public bool Submit(ICounterPayload data)
     {
-        if (_stopWriting)
-        {
-            _logger.LogDebug("Submitting skipped.");
-            return false;
-        }
-
         bool success = _workingQueue.Writer.TryWrite(data);
         if (_logger.IsEnabled(LogLevel.Trace))
         {
@@ -238,12 +273,24 @@ internal sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPaylo
 
     public async ValueTask DisposeAsync()
     {
-        if (_currentStream?.Stream is not null)
+        if (_isDisposed)
         {
-            _logger.LogDebug("Disposing current stream...");
-            await _currentStream.Value.Stream.DisposeAsync().ConfigureAwait(false);
-            _currentStream = null;
+            return;
         }
+        _isDisposed = true;
+
+        _logger.LogInformation("Flush the buffer and send data to storage...");
+
+        bool writerCompleted = _workingQueue.Writer.TryComplete();
+        _logger.LogDebug("Channel writer got completed: {result}", writerCompleted);
+        if (writerCompleted)
+        {
+            // The last batch
+            await _workingQueue.Reader.Completion.ConfigureAwait(false);
+            _logger.LogDebug("Channel reader completed.");
+        }
+
+        await FlushAsync(default).ConfigureAwait(false);
 
         _semaphoreSlim?.Dispose();
         _semaphoreSlim = null;

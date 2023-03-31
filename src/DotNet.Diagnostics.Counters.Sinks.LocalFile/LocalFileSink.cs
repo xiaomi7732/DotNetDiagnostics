@@ -110,6 +110,13 @@ internal sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPaylo
 
     public async ValueTask DisposeAsync()
     {
+        _logger.LogInformation("Flush the buffer and send data to storage...");
+
+        if (_workingQueue.Writer.TryComplete())
+        {
+            await _workingQueue.Reader.Completion;
+        }
+
         if (_currentStream is not null)
         {
             await _currentStream.DisposeAsync();
