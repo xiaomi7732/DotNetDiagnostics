@@ -1,0 +1,36 @@
+name: Release NuGets
+
+on:
+  workflow_dispatch:
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+  DOTNET_NOLOGO: true
+  NuGetDirectory: ${{ github.workspace}}/nuget
+
+jobs:
+  build_nugets:
+    strategy:
+      matrix:
+        project: [
+          "src/DotNet.Diagnostics.Core/DotNet.Diagnostics.Core.csproj",
+          "src/DotNet.Diagnostics.Counters/DotNet.Diagnostics.Counters.csproj",
+          "src/DotNet.Diagnostics.Counters.WebEndpoints/DotNet.Diagnostics.Counters.WebEndpoints.csproj",
+          "src/DotNet.Diagnostics.Counters.Sinks.LocalFile/DotNet.Diagnostics.Counters.Sinks.LocalFile.csproj",
+          "src/DotNet.Diagnostics.Counters.Sinks.AzureBlob/DotNet.Diagnostics.Counters.Sinks.AzureBlob.csproj"
+        ]
+    runs-on: ubuntu-latest
+    steps:
+
+      - uses: actions/checkout@v3
+
+      # Build NuGet packages
+      - run: dotnet pack ${{ matrix.project }} --configuration Release --output ${{ env.NuGetDirectory }}
+
+      # Publish the NuGet packages as an artifact
+      - uses: actions/upload-artifact@v3
+        with:
+          name: nuget
+          if-no-files-found: error
+          retention-days: 1
+          path: ${{ env.NuGetDirectory }}/*.nupkg
