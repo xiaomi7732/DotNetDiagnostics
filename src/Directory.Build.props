@@ -1,11 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Project>
-    <PropertyGroup>
-        <UsingMicrosoftNETSdk>true</UsingMicrosoftNETSdk>
-    </PropertyGroup>
+  <PropertyGroup>
+    <UsingMicrosoftNETSdk>true</UsingMicrosoftNETSdk>
+  </PropertyGroup>
 
-    <PropertyGroup>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
-    </PropertyGroup>
+  <PropertyGroup>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!-- Properties for NuGet packages -->
+  <PropertyGroup>
+    <PackageVersion>1.0.0-beta1</PackageVersion>
+    <Description>Integrate .NET diagnostics tools into your code and seamlessly deliver results to multiple destinations.</Description>
+    <Authors>xiaomi7732</Authors>
+    <Company>CodeWithSaar</Company>
+    <PackageTags>dotnet-counters;dotnet-trace;dotnet-dumps;webapi</PackageTags>
+    <PackageProjectUrl>https://www.codewithsaar.net</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/xiaomi7732/DotNetDiagnostics</RepositoryUrl>
+    <RespositoryType>git</RespositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>Readme.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)../Readme.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 </Project>

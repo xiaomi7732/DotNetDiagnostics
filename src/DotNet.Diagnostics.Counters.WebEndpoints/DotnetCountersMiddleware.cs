@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace DotNet.Diagnostics.Counters.WebHooks;
+namespace DotNet.Diagnostics.Counters.WebEndpoints;
 
 public class DotNetCounterMiddleware
 {

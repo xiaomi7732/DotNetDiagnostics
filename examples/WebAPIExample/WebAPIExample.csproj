@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\DotNet.Diagnostics.Counters.WebHooks\DotNet.Diagnostics.Counters.WebHooks.csproj" />
+    <ProjectReference Include="..\..\src\DotNet.Diagnostics.Counters.WebEndpoints\DotNet.Diagnostics.Counters.WebEndpoints.csproj" />
     <ProjectReference Include="..\..\src\DotNet.Diagnostics.Counters.Sinks.LocalFile\DotNet.Diagnostics.Counters.Sinks.LocalFile.csproj" />
     <ProjectReference Include="..\..\src\DotNet.Diagnostics.Counters.Sinks.AzureBlob\DotNet.Diagnostics.Counters.Sinks.AzureBlob.csproj" />
   </ItemGroup>

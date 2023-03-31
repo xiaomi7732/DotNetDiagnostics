@@ -1,8 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <PropertyGroup>
+    <PackageId>DotNet.Diagnostics.Counters.Sinks.LocalFile</PackageId>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\DotNet.Diagnostics.Core\DotNet.Diagnostics.Core.csproj" />
-    <ProjectReference Include="..\DotNet.Diagnostics.Counters\DotNet.Diagnostics.Counters.csproj" />
+    <ProjectReference
+      Include="..\DotNet.Diagnostics.Counters\DotNet.Diagnostics.Counters.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -12,7 +17,8 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Options" Version="7.0.1" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="7.0.0" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="7.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions"
+      Version="7.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="7.0.0" />
   </ItemGroup>
 </Project>
