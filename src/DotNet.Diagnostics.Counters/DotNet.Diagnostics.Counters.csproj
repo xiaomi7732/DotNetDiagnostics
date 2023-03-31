@@ -4,7 +4,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <PackageId>DotNet.Diagnostics.Counters</PackageId>
+    <PackageId>OpenDotNetDiagnostics.Counters</PackageId>
   </PropertyGroup>
 
   <ItemGroup>

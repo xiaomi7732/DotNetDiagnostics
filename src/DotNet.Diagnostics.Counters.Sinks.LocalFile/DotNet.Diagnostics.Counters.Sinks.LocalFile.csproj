@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <PackageId>DotNet.Diagnostics.Counters.Sinks.LocalFile</PackageId>
+    <PackageId>OpenDotNetDiagnostics.Counters.Sinks.LocalFile</PackageId>
   </PropertyGroup>
 
   <ItemGroup>
