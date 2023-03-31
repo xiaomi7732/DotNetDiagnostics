@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using DotNet.Diagnostics.Counters;
-using DotNet.Diagnostics.Counters.WebHooks;
+using DotNet.Diagnostics.Counters.WebEndpoints;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;

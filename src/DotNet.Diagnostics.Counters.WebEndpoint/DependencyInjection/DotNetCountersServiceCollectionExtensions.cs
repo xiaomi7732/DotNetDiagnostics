@@ -1,5 +1,5 @@
 using DotNet.Diagnostics.Counters;
-using DotNet.Diagnostics.Counters.WebHooks;
+using DotNet.Diagnostics.Counters.WebEndpoints;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 

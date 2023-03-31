@@ -1,4 +1,4 @@
-namespace DotNet.Diagnostics.Counters.WebHooks;
+namespace DotNet.Diagnostics.Counters.WebEndpoints;
 
 public record ResponseBodyContract
 {
