@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>OpenDotNetDiagnostics.Counters.Sinks.ApplicationInsights</PackageId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.ApplicationInsights" Version="2.21.0" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="7.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DotNet.Diagnostics.Core\DotNet.Diagnostics.Core.csproj" />
+    <ProjectReference Include="..\DotNet.Diagnostics.Counters\DotNet.Diagnostics.Counters.csproj" />
+  </ItemGroup>
+
+</Project>
