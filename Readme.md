@@ -94,3 +94,17 @@ We aim to alleviate the following **pain points**:
 | [dotnet-trace](https://github.com/dotnet/diagnostics/blob/main/documentation/dotnet-trace-instructions.md)       | Planning                                                                                                                                                                                                                                                          | Planning                                                                                                                                                                                                                                                                                                                                                                                             | Planning                                                                                                                                                                                                                                                          | Backlog     |
 
 There are quite a few to crewing through. Please feel free to contact if want to contribute.
+
+* Core projects
+    * Core - fundamental utilities, data contracts, abstractions.
+    * Counters - `dotnet-counters` specific implementations.
+
+* Endpoints
+    * dotnet-counters
+        * WebEndpoints - expose dotnet-counters as a WebAPI endpoint. Default to `PUT /dotnet-counters`.
+
+* Sinks
+    * dotnet-counters
+        * Local file - beta, outputs data to local file.
+        * Azure Blob - beta, outputs data to Azure Storage for easy access.
+        * Application insights - beta, outputs data to Application Insights for powerful query.
