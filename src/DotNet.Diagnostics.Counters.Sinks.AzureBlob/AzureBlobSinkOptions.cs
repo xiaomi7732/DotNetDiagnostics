@@ -1,7 +1,9 @@
-namespace DotNet.Diagnostics.Counters.Sinks;
+namespace DotNet.Diagnostics.Counters.Sinks.AzureBlob;
 
 public class AzureBlobSinkOptions
 {
+    public const string DefaultSectionName="AzureBlob";
+
     /// <summary>
     /// Gets or sets the connection string to the Azure Blob Storage.
     public string? ConnectionString { get; set; }

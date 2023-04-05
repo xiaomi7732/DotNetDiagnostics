@@ -1,6 +1,5 @@
 using DotNet.Diagnostics.Core;
 using DotNet.Diagnostics.Counters;
-using DotNet.Diagnostics.Counters.Sinks;
 using DotNet.Diagnostics.Counters.Sinks.AzureBlob;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,11 +9,23 @@ namespace Microsoft.AspNetCore.Builder;
 
 public static class AzureBlobSinkServiceCollectionExtensions
 {
-    public static IServiceCollection AddDotNetCounterAzureBlobSink(this IServiceCollection services, string sectionName = "DotNetCounterAzureBlobSink")
+    public static DotNetCountersPipelineBuilder WithAzureBlobSink(
+        this DotNetCountersPipelineBuilder builder,
+        string sinksSectionName = SinkOptions.DefaultSectionName,
+        string sectionName = AzureBlobSinkOptions.DefaultSectionName)
+    {
+        builder.AppendAction(services =>
+        {
+            services.AddDotNetCounterAzureBlobSink(builder.SectionName, sinksSectionName, sectionName);
+        });
+        return builder;
+    }
+
+    private static IServiceCollection AddDotNetCounterAzureBlobSink(this IServiceCollection services, string baseSectionName, string sinksSectionName, string sectionName)
     {
         services.AddOptions<AzureBlobSinkOptions>().Configure<IConfiguration>((opt, config) =>
         {
-            config.GetSection(sectionName).Bind(opt);
+            config.GetSection(baseSectionName).GetSection(sinksSectionName).GetSection(sectionName).Bind(opt);
         });
 
         services.TryAddSingleton<WebAppContext>(_ => WebAppContext.Instance);

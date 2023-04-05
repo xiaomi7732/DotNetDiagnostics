@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 
 namespace DotNet.Diagnostics.Counters.Sinks.LocalFile;
 
-internal sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPayload>, IAsyncDisposable
+public sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPayload>, IAsyncDisposable
 {
     private readonly LocalFileSinkOptions _options;
     private static FileStream? _currentStream = null;
@@ -114,7 +114,9 @@ internal sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPaylo
 
         if (_workingQueue.Writer.TryComplete())
         {
+            _logger.LogDebug("Writer completed.");
             await _workingQueue.Reader.Completion;
+            _logger.LogDebug("Reader completed.");
         }
 
         if (_currentStream is not null)

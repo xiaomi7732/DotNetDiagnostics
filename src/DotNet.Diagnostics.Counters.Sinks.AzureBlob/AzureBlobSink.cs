@@ -9,7 +9,7 @@ using Microsoft.Extensions.Options;
 
 namespace DotNet.Diagnostics.Counters.Sinks.AzureBlob;
 
-internal sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload>, IAsyncDisposable
+public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload>, IAsyncDisposable
 {
     private bool _isDisposed = false;
     private readonly Dictionary<string, MemoryStream> _cache = new Dictionary<string, MemoryStream>(StringComparer.Ordinal);
@@ -286,6 +286,7 @@ internal sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPaylo
         if (writerCompleted)
         {
             // The last batch
+            _logger.LogDebug("Writer completed.");
             await _workingQueue.Reader.Completion.ConfigureAwait(false);
             _logger.LogDebug("Channel reader completed.");
         }

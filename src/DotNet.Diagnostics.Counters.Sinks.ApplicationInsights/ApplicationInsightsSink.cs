@@ -5,7 +5,7 @@ using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace DotNet.Diagnostics.Counters.Sinks.AzureBlob;
+namespace DotNet.Diagnostics.Counters.Sinks.ApplicationInsights;
 
 public class ApplicationInsightsSink : ISink<IDotNetCountersClient, ICounterPayload>
 {
