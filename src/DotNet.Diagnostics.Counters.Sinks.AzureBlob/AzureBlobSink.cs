@@ -91,22 +91,14 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
         await _blobContainerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
         _logger.LogInformation("Blob container exists.");
 
-        while (!cancellationToken.IsCancellationRequested)
-        {
-            try
-            {
-                await StartReadingQueueAsync().ConfigureAwait(false);
-            }
-            catch (OperationCanceledException cancel) when (cancel.CancellationToken == cancellationToken)
-            {
-                _logger.LogDebug("Task cancelled. Gracefully shutting down.");
-                await FlushAsync(cancellationToken: default).ConfigureAwait(false);
-                _logger.LogDebug("Working queue writer stopped.");
-                throw;
-            }
-        }
+        await StartReadingQueueAsync().ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Start watching the queue.
+    /// Notes, the cancellation token is not provided on purpose. Once start, always reading to the end of the channel.
+    /// </summary>
+    /// <returns></returns>
     private async Task StartReadingQueueAsync()
     {
         await foreach (ICounterPayload data in _workingQueue.Reader.ReadAllAsync(default).ConfigureAwait(false))

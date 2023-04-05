@@ -40,15 +40,21 @@ public sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPayload
         return success;
     }
 
-    public async Task StartAsync(CancellationToken cancellationToken)
+    public Task StartAsync(CancellationToken cancellationToken) => StartAsync();
+
+    /// <summary>
+    /// Start watching the working queue. Notes: the cancellation token is not provided on purpose. Once it is 
+    /// in the job channel, it will need to be fetch to the end.
+    /// </summary>
+    private async Task StartAsync()
     {
-        await foreach (ICounterPayload data in _workingQueue.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        await foreach (ICounterPayload data in _workingQueue.Reader.ReadAllAsync(default).ConfigureAwait(false))
         {
-            await WriteDataAsync(data, cancellationToken).ConfigureAwait(false);
+            await WriteDataAsync(data).ConfigureAwait(false);
         }
     }
 
-    private async Task WriteDataAsync(ICounterPayload payload, CancellationToken cancellationToken)
+    private async Task WriteDataAsync(ICounterPayload payload)
     {
         string fullFileName = GetFullFileName(payload.Timestamp);
         Directory.CreateDirectory(Path.GetDirectoryName(fullFileName)!);
@@ -64,7 +70,7 @@ public sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPayload
         {
             _logger.LogInformation("Open writing: {fileName}", fullFileName);
             _currentStream = File.Open(fullFileName, fileStreamOptions);
-            await WriteHeaderAsync(_currentStream, cancellationToken).ConfigureAwait(false);
+            await WriteHeaderAsync(_currentStream, default).ConfigureAwait(false);
         }
 
         if (!string.Equals(_currentStream.Name, fullFileName, StringComparison.OrdinalIgnoreCase))
@@ -81,11 +87,11 @@ public sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPayload
             {
                 _logger.LogInformation("Open new file for writing: {fileName}", fullFileName);
                 _currentStream = File.Open(fullFileName, fileStreamOptions);
-                await WriteHeaderAsync(_currentStream, cancellationToken).ConfigureAwait(false);
+                await WriteHeaderAsync(_currentStream, default).ConfigureAwait(false);
             }
         }
 
-        await WriteDataAsync(_currentStream, payload, cancellationToken).ConfigureAwait(false);
+        await WriteDataAsync(_currentStream, payload, default).ConfigureAwait(false);
     }
 
     private string GetFullFileName(DateTime timestamp)
