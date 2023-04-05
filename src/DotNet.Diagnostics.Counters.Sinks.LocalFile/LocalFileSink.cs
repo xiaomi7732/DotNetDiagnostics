@@ -40,17 +40,18 @@ public sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPayload
         return success;
     }
 
-    public Task StartAsync(CancellationToken cancellationToken) => StartAsync();
+    public Task StartAsync(CancellationToken cancellationToken) => StartWatchingQueueAsync(cancellationToken);
 
-    /// <summary>
-    /// Start watching the working queue. Notes: the cancellation token is not provided on purpose. Once it is 
-    /// in the job channel, it will need to be fetch to the end.
-    /// </summary>
-    private async Task StartAsync()
+    private async Task StartWatchingQueueAsync(CancellationToken cancellationToken)
     {
         await foreach (ICounterPayload data in _workingQueue.Reader.ReadAllAsync(default).ConfigureAwait(false))
         {
             await WriteDataAsync(data).ConfigureAwait(false);
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                _workingQueue.Writer.TryComplete();
+            }
         }
     }
 
@@ -118,12 +119,10 @@ public sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPayload
     {
         _logger.LogInformation("Flush the buffer and send data to storage...");
 
-        if (_workingQueue.Writer.TryComplete())
-        {
-            _logger.LogDebug("Writer completed.");
-            await _workingQueue.Reader.Completion;
-            _logger.LogDebug("Reader completed.");
-        }
+        _workingQueue.Writer.TryComplete();
+        _logger.LogDebug("Writer completed.");
+        await _workingQueue.Reader.Completion;
+        _logger.LogDebug("Reader completed.");
 
         if (_currentStream is not null)
         {

@@ -91,7 +91,7 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
         await _blobContainerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
         _logger.LogInformation("Blob container exists.");
 
-        await StartReadingQueueAsync().ConfigureAwait(false);
+        await StartReadingQueueAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -99,11 +99,15 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
     /// Notes, the cancellation token is not provided on purpose. Once start, always reading to the end of the channel.
     /// </summary>
     /// <returns></returns>
-    private async Task StartReadingQueueAsync()
+    private async Task StartReadingQueueAsync(CancellationToken cancellationToken)
     {
         await foreach (ICounterPayload data in _workingQueue.Reader.ReadAllAsync(default).ConfigureAwait(false))
         {
             await WriteDataAsync(data, default).ConfigureAwait(false);
+            if(cancellationToken.IsCancellationRequested)
+            {
+                _workingQueue.Writer.TryComplete();
+            }
         }
     }
 
@@ -272,16 +276,21 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
         _isDisposed = true;
 
         _logger.LogInformation("Flush the buffer and send data to storage...");
-
         bool writerCompleted = _workingQueue.Writer.TryComplete();
-        _logger.LogDebug("Channel writer got completed: {result}", writerCompleted);
-        if (writerCompleted)
+        if(writerCompleted)
         {
+            _logger.LogDebug("Writer completed");
+        }
+        else
+        {
+            _logger.LogDebug("Writer failed completing. Maybe already completed before?");
+        }
+
+        _logger.LogDebug("Channel writer got completed: {result}", writerCompleted);
             // The last batch
             _logger.LogDebug("Writer completed.");
             await _workingQueue.Reader.Completion.ConfigureAwait(false);
             _logger.LogDebug("Channel reader completed.");
-        }
 
         await FlushAsync(default).ConfigureAwait(false);
 
