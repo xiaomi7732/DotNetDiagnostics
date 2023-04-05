@@ -9,8 +9,8 @@ namespace DotNet.Diagnostics.Counters.Sinks.ApplicationInsights;
 
 public class ApplicationInsightsSink : ISink<IDotNetCountersClient, ICounterPayload>
 {
-    private readonly TelemetryClient? _telemetryClient;
-    private readonly TelemetryConfiguration? _telemetryConfiguration;
+    private TelemetryClient? _telemetryClient;
+    private TelemetryConfiguration? _telemetryConfiguration;
     private readonly ILogger _logger;
 
     public ApplicationInsightsSink(
@@ -52,6 +52,16 @@ public class ApplicationInsightsSink : ISink<IDotNetCountersClient, ICounterPayl
         if (_telemetryConfiguration is null || _telemetryClient is null)
         {
             _logger.LogInformation("Application Insights is not configured.");
+            return;
+        }
+
+        string instrumentationKey = _telemetryConfiguration.InstrumentationKey;
+        if(string.IsNullOrEmpty(instrumentationKey))
+        {
+            _logger.LogWarning("Instrumentation key is required. Have you configured the application insights instrumentation key or connection string correctly?");
+            _telemetryConfiguration = null;
+            _telemetryClient = null;
+            
             return;
         }
 
