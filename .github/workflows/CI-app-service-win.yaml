@@ -8,6 +8,9 @@ env:
 
 on:
   push:
+    paths-ignore:
+      - "Readme.md"
+      - "images/**"
     branches: [ "main" ]
   workflow_dispatch:
 
