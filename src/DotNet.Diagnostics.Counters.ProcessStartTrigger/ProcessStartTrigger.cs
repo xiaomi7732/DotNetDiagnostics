@@ -23,6 +23,12 @@ public class ProcessStartTrigger : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if(!_options.IsEnabled)
+        {
+            _logger.LogInformation("Dotnet-counter process start trigger is disabled.");
+            return;
+        }
+
         _logger.LogInformation("Start dotent-counter with the process, delay for {initialDelay}", _options.InitialDelay);
         await Task.Delay(_options.InitialDelay, stoppingToken).ConfigureAwait(false);
         await _dotnetCounters.EnableAsync(stoppingToken).ConfigureAwait(false);
