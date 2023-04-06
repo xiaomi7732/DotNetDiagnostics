@@ -19,7 +19,8 @@ jobs:
           "src/DotNet.Diagnostics.Counters.WebEndpoints/DotNet.Diagnostics.Counters.WebEndpoints.csproj",
           "src/DotNet.Diagnostics.Counters.Sinks.LocalFile/DotNet.Diagnostics.Counters.Sinks.LocalFile.csproj",
           "src/DotNet.Diagnostics.Counters.Sinks.AzureBlob/DotNet.Diagnostics.Counters.Sinks.AzureBlob.csproj",
-          "src/DotNet.Diagnostics.Counters.Sinks.ApplicationInsights/DotNet.Diagnostics.Counters.Sinks.ApplicationInsights.csproj"
+          "src/DotNet.Diagnostics.Counters.Sinks.ApplicationInsights/DotNet.Diagnostics.Counters.Sinks.ApplicationInsights.csproj",
+          "src/DotNet.Diagnostics.Counteres.ProcessStartTrigger/DotNet.Diagnostics.Counteres.ProcessStartTrigger.csproj"
         ]
     runs-on: ubuntu-latest
     steps:
