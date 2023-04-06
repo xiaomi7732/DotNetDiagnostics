@@ -267,7 +267,11 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
 
         string fileName = _options.FileNamePrefix;
 
-        string machineId = string.IsNullOrEmpty(_webAppContext.SiteInstanceId) ? Environment.MachineName : _webAppContext.SiteInstanceId;
+        string machineId = string.IsNullOrEmpty(_webAppContext.SiteName) ? Environment.MachineName : _webAppContext.SiteName;
+        if (!string.IsNullOrEmpty(_webAppContext.SiteInstanceId))
+        {
+            machineId += '_' + _webAppContext.SiteInstanceId;
+        }
 
         string prefix = string.Join("_", (object)_options.FileNamePrefix, machineId, timestamp.ToUniversalTime().ToString("yyyyMMddHH", CultureInfo.InvariantCulture)).Trim('_');
 
