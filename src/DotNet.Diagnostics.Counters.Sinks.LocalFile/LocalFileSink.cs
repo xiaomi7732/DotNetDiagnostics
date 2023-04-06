@@ -5,8 +5,9 @@ using Microsoft.Extensions.Options;
 
 namespace DotNet.Diagnostics.Counters.Sinks.LocalFile;
 
-internal sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPayload>, IAsyncDisposable
+public sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPayload>, IAsyncDisposable
 {
+    private bool _isDisposed = false;
     private readonly LocalFileSinkOptions _options;
     private static FileStream? _currentStream = null;
     private readonly Channel<ICounterPayload> _workingQueue = Channel.CreateUnbounded<ICounterPayload>(new UnboundedChannelOptions()
@@ -40,15 +41,32 @@ internal sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPaylo
         return success;
     }
 
-    public async Task StartAsync(CancellationToken cancellationToken)
+    public Task StartAsync(CancellationToken cancellationToken) => StartWatchingQueueAsync(cancellationToken);
+
+    private async Task StartWatchingQueueAsync(CancellationToken cancellationToken)
     {
-        await foreach (ICounterPayload data in _workingQueue.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        try
         {
-            await WriteDataAsync(data, cancellationToken).ConfigureAwait(false);
+            await PumpTheChannelAsync(cancellationToken);
+        }
+        catch (OperationCanceledException ex) when (ex.CancellationToken == cancellationToken)
+        {
+            _workingQueue.Writer.TryComplete();
+            // Clean up the queue.
+            await PumpTheChannelAsync(default).ConfigureAwait(false); // No cancellation token this time.
+            throw;
         }
     }
 
-    private async Task WriteDataAsync(ICounterPayload payload, CancellationToken cancellationToken)
+    private async Task PumpTheChannelAsync(CancellationToken cancellationToken)
+    {
+        await foreach (ICounterPayload data in _workingQueue.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        {
+            await WriteDataAsync(data).ConfigureAwait(false);
+        }
+    }
+
+    private async Task WriteDataAsync(ICounterPayload payload)
     {
         string fullFileName = GetFullFileName(payload.Timestamp);
         Directory.CreateDirectory(Path.GetDirectoryName(fullFileName)!);
@@ -64,7 +82,7 @@ internal sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPaylo
         {
             _logger.LogInformation("Open writing: {fileName}", fullFileName);
             _currentStream = File.Open(fullFileName, fileStreamOptions);
-            await WriteHeaderAsync(_currentStream, cancellationToken).ConfigureAwait(false);
+            await WriteHeaderAsync(_currentStream, default).ConfigureAwait(false);
         }
 
         if (!string.Equals(_currentStream.Name, fullFileName, StringComparison.OrdinalIgnoreCase))
@@ -81,11 +99,11 @@ internal sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPaylo
             {
                 _logger.LogInformation("Open new file for writing: {fileName}", fullFileName);
                 _currentStream = File.Open(fullFileName, fileStreamOptions);
-                await WriteHeaderAsync(_currentStream, cancellationToken).ConfigureAwait(false);
+                await WriteHeaderAsync(_currentStream, default).ConfigureAwait(false);
             }
         }
 
-        await WriteDataAsync(_currentStream, payload, cancellationToken).ConfigureAwait(false);
+        await WriteDataAsync(_currentStream, payload, default).ConfigureAwait(false);
     }
 
     private string GetFullFileName(DateTime timestamp)
@@ -110,12 +128,18 @@ internal sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPaylo
 
     public async ValueTask DisposeAsync()
     {
+        if (_isDisposed)
+        {
+            return;
+        }
+        _isDisposed = true;
+
         _logger.LogInformation("Flush the buffer and send data to storage...");
 
-        if (_workingQueue.Writer.TryComplete())
-        {
-            await _workingQueue.Reader.Completion;
-        }
+        _workingQueue.Writer.TryComplete();
+        _logger.LogDebug("Writer completed.");
+        await _workingQueue.Reader.Completion;
+        _logger.LogDebug("Reader completed.");
 
         if (_currentStream is not null)
         {

@@ -9,7 +9,7 @@ using Microsoft.Extensions.Options;
 
 namespace DotNet.Diagnostics.Counters.Sinks.AzureBlob;
 
-internal sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload>, IAsyncDisposable
+public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload>, IAsyncDisposable
 {
     private bool _isDisposed = false;
     private readonly Dictionary<string, MemoryStream> _cache = new Dictionary<string, MemoryStream>(StringComparer.Ordinal);
@@ -91,25 +91,32 @@ internal sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPaylo
         await _blobContainerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
         _logger.LogInformation("Blob container exists.");
 
-        while (!cancellationToken.IsCancellationRequested)
+        await StartReadingQueueAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Start watching the queue.
+    /// Notes, the cancellation token is not provided on purpose. Once start, always reading to the end of the channel.
+    /// </summary>
+    /// <returns></returns>
+    private async Task StartReadingQueueAsync(CancellationToken cancellationToken)
+    {
+        try
         {
-            try
-            {
-                await StartReadingQueueAsync().ConfigureAwait(false);
-            }
-            catch (OperationCanceledException cancel) when (cancel.CancellationToken == cancellationToken)
-            {
-                _logger.LogDebug("Task cancelled. Gracefully shutting down.");
-                await FlushAsync(cancellationToken: default).ConfigureAwait(false);
-                _logger.LogDebug("Working queue writer stopped.");
-                throw;
-            }
+            await PumpTheChannelAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException ex) when (ex.CancellationToken == cancellationToken)
+        {
+            _workingQueue.Writer.TryComplete();
+            // No cancellation token this time.
+            await PumpTheChannelAsync(default).ConfigureAwait(false);
+            throw;
         }
     }
 
-    private async Task StartReadingQueueAsync()
+    private async Task PumpTheChannelAsync(CancellationToken cancellationToken)
     {
-        await foreach (ICounterPayload data in _workingQueue.Reader.ReadAllAsync(default).ConfigureAwait(false))
+        await foreach (ICounterPayload data in _workingQueue.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
             await WriteDataAsync(data, default).ConfigureAwait(false);
         }
@@ -280,15 +287,21 @@ internal sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPaylo
         _isDisposed = true;
 
         _logger.LogInformation("Flush the buffer and send data to storage...");
-
         bool writerCompleted = _workingQueue.Writer.TryComplete();
-        _logger.LogDebug("Channel writer got completed: {result}", writerCompleted);
         if (writerCompleted)
         {
-            // The last batch
-            await _workingQueue.Reader.Completion.ConfigureAwait(false);
-            _logger.LogDebug("Channel reader completed.");
+            _logger.LogDebug("Writer completed");
         }
+        else
+        {
+            _logger.LogDebug("Writer failed completing. Maybe already completed before?");
+        }
+
+        _logger.LogDebug("Channel writer got completed: {result}", writerCompleted);
+        // The last batch
+        _logger.LogDebug("Writer completed.");
+        await _workingQueue.Reader.Completion.ConfigureAwait(false);
+        _logger.LogDebug("Channel reader completed.");
 
         await FlushAsync(default).ConfigureAwait(false);
 

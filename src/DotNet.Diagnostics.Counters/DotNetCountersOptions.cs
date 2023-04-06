@@ -3,6 +3,11 @@ namespace DotNet.Diagnostics.Counters;
 public class DotNetCountersOptions
 {
     /// <summary>
+    /// Gets the default section name of dotnet counters.
+    /// </summary>
+    public const string DefaultSectionName="DotNetCounters";
+
+    /// <summary>
     /// Gets a default dotnet counters options.
     /// </summary>
     /// <returns></returns>

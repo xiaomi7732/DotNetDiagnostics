@@ -21,10 +21,10 @@ Assuming you have an ASP.NET Core WebAPI project:
     ```csharp
     var builder = WebApplication.CreateBuilder(args);
 
-    // Add services needed to run dotnet-counters
-    builder.Services.AddDotNetCounters();
-    // Add services needed for the local file sink for dotnet-counters
-    builder.Services.AddDotNetCounterLocalFileSink();
+    // Register `dotnet-counters` service and its sink.
+    builder.Services.AddDotNetCounters()
+        .WithLocalFileSink()
+        .Register();
 
     var app = builder.Build();
 
@@ -35,10 +35,12 @@ Assuming you have an ASP.NET Core WebAPI project:
     app.Run();
     ```
 
+    Other sinks, for example, Azure Blob or Application Insights are also supported. See [wiki](/xiaomi7732/DotNetDiagnostics/wiki#sinks) for more details.
+
 3. Optionally, customize the settings, for example, you could specify a invoking secret than the default of `1123` by putting this in your [appsettings.json](./examples/WebAPIExample/appsettings.Development.json):
 
     ```json
-    "DotNetCountersWebhook": {
+    "DotNetCounters": {
         "InvokingSecret": "1111"
     },
     ```

@@ -3,7 +3,7 @@ using Microsoft.Extensions.Options;
 
 namespace DotNet.Diagnostics.Counters.Sinks.LocalFile;
 
-internal class LoggingFileNameProvider
+public class LoggingFileNameProvider
 {
     private readonly LocalFileSinkOptions _options;
     private readonly WebAppContext _webAppContext;
