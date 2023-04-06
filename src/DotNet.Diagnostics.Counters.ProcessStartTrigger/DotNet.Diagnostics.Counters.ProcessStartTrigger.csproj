@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>OpenDotNetDiagnostics.Counters.Triggers.ProcessStart</PackageId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference
+      Include="..\DotNet.Diagnostics.Counters\DotNet.Diagnostics.Counters.csproj" />
+  </ItemGroup>
+</Project>
