@@ -101,13 +101,24 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
     /// <returns></returns>
     private async Task StartReadingQueueAsync(CancellationToken cancellationToken)
     {
-        await foreach (ICounterPayload data in _workingQueue.Reader.ReadAllAsync(default).ConfigureAwait(false))
+        try
+        {
+            await PumpTheChannelAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException ex) when (ex.CancellationToken == cancellationToken)
+        {
+            _workingQueue.Writer.TryComplete();
+            // No cancellation token this time.
+            await PumpTheChannelAsync(default).ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    private async Task PumpTheChannelAsync(CancellationToken cancellationToken)
+    {
+        await foreach (ICounterPayload data in _workingQueue.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
             await WriteDataAsync(data, default).ConfigureAwait(false);
-            if(cancellationToken.IsCancellationRequested)
-            {
-                _workingQueue.Writer.TryComplete();
-            }
         }
     }
 
@@ -277,7 +288,7 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
 
         _logger.LogInformation("Flush the buffer and send data to storage...");
         bool writerCompleted = _workingQueue.Writer.TryComplete();
-        if(writerCompleted)
+        if (writerCompleted)
         {
             _logger.LogDebug("Writer completed");
         }
@@ -287,10 +298,10 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
         }
 
         _logger.LogDebug("Channel writer got completed: {result}", writerCompleted);
-            // The last batch
-            _logger.LogDebug("Writer completed.");
-            await _workingQueue.Reader.Completion.ConfigureAwait(false);
-            _logger.LogDebug("Channel reader completed.");
+        // The last batch
+        _logger.LogDebug("Writer completed.");
+        await _workingQueue.Reader.Completion.ConfigureAwait(false);
+        _logger.LogDebug("Channel reader completed.");
 
         await FlushAsync(default).ConfigureAwait(false);
 

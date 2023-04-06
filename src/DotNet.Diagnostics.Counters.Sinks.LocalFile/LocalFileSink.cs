@@ -45,14 +45,24 @@ public sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPayload
 
     private async Task StartWatchingQueueAsync(CancellationToken cancellationToken)
     {
-        await foreach (ICounterPayload data in _workingQueue.Reader.ReadAllAsync(default).ConfigureAwait(false))
+        try
+        {
+            await PumpTheChannelAsync(cancellationToken);
+        }
+        catch (OperationCanceledException ex) when (ex.CancellationToken == cancellationToken)
+        {
+            _workingQueue.Writer.TryComplete();
+            // Clean up the queue.
+            await PumpTheChannelAsync(default).ConfigureAwait(false); // No cancellation token this time.
+            throw;
+        }
+    }
+
+    private async Task PumpTheChannelAsync(CancellationToken cancellationToken)
+    {
+        await foreach (ICounterPayload data in _workingQueue.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
             await WriteDataAsync(data).ConfigureAwait(false);
-
-            if (cancellationToken.IsCancellationRequested)
-            {
-                _workingQueue.Writer.TryComplete();
-            }
         }
     }
 
