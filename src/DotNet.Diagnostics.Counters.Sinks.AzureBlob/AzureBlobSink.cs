@@ -87,11 +87,18 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Ensure blob container exists: {containerName}", _blobContainerClient.Name);
-        await _blobContainerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
-        _logger.LogInformation("Blob container exists.");
+        try
+        {
+            _logger.LogInformation("Ensure blob container exists: {containerName}", _blobContainerClient.Name);
+            await _blobContainerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+            _logger.LogInformation("Blob container exists.");
 
-        await StartReadingQueueAsync(cancellationToken).ConfigureAwait(false);
+            await StartReadingQueueAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (AuthenticationFailedException ex)
+        {
+            _logger.LogError(ex, "Failed starting the sink. Have you configured the client id for the managed identity?");
+        }
     }
 
     /// <summary>
