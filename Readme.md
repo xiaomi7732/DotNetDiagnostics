@@ -35,7 +35,7 @@ Assuming you have an ASP.NET Core WebAPI project:
     app.Run();
     ```
 
-    Other sinks, for example, Azure Blob or Application Insights are also supported. See [wiki](/xiaomi7732/DotNetDiagnostics/wiki#sinks) for more details.
+    Other sinks, for example, Azure Blob or Application Insights are also supported. See [wiki](https://github.com/xiaomi7732/DotNetDiagnostics/wiki#sinks) for more details.
 
 3. Optionally, customize the settings, for example, you could specify a invoking secret than the default of `1123` by putting this in your [appsettings.json](./examples/WebAPIExample/appsettings.Development.json):
 
