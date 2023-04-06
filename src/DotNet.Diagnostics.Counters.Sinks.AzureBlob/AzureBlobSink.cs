@@ -59,7 +59,7 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
                 ManagedIdentityClientId = _options.ManagedIdentityClientId,
                 ExcludeInteractiveBrowserCredential = true,
             };
-            blobServiceClient = new BlobServiceClient(_options.ServiceUri, new DefaultAzureCredential());
+            blobServiceClient = new BlobServiceClient(_options.ServiceUri, new DefaultAzureCredential(defaultAzureCredentialOptions));
         }
         _blobContainerClient = blobServiceClient.GetBlobContainerClient(_options.ContainerName);
     }
