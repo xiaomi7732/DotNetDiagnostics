@@ -7,6 +7,7 @@ namespace DotNet.Diagnostics.Counters.Sinks.LocalFile;
 
 public sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPayload>, IAsyncDisposable
 {
+    private bool _isDisposed = false;
     private readonly LocalFileSinkOptions _options;
     private static FileStream? _currentStream = null;
     private readonly Channel<ICounterPayload> _workingQueue = Channel.CreateUnbounded<ICounterPayload>(new UnboundedChannelOptions()
@@ -117,6 +118,12 @@ public sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPayload
 
     public async ValueTask DisposeAsync()
     {
+        if (_isDisposed)
+        {
+            return;
+        }
+        _isDisposed = true;
+
         _logger.LogInformation("Flush the buffer and send data to storage...");
 
         _workingQueue.Writer.TryComplete();
