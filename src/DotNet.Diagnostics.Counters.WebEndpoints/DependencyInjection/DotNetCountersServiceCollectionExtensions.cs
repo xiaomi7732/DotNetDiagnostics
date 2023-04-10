@@ -1,3 +1,4 @@
+using DotNet.Diagnostics.Core.Utilities;
 using DotNet.Diagnostics.Counters;
 using DotNet.Diagnostics.Counters.WebEndpoints;
 using Microsoft.Extensions.Configuration;
@@ -23,6 +24,7 @@ public static class DotNetCountersServiceCollectionExtensions
 
             services.TryAddSingleton<DotNetCountEventCounterManager>();
             services.TryAddSingleton<IDotNetCountersClient, DotNetCountersClient>();
+            services.TryAddSingleton<EnvVarFilter>(_ => EnvVarFilter.Instance);
         });
 
         return new DotNetCountersPipelineBuilder(actions, services, sectionName);
