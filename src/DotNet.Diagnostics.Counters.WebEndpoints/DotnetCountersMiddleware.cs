@@ -34,7 +34,19 @@ public class DotNetCounterMiddleware
         _jsonSerializationOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
         _jobDispatchers = jobDispatchers ?? Enumerable.Empty<IJobDispatcher<DotNetCountersJobDetail>>();
 
-        _logger.LogDebug("Job dispatcher counter: {count}", _jobDispatchers.Count());
+        int jobDispatchCount = _jobDispatchers.Count();
+        if (jobDispatchCount == 0)
+        {
+            _logger.LogInformation("No job dispatcher configured. Fits best for single instance environment.");
+        }
+        else if (jobDispatchCount == 1)
+        {
+            _logger.LogInformation("1 job dispatcher configured. Support multiple-instance environment.");
+        }
+        else
+        {
+            _logger.LogWarning("More than 1 Job dispatcher configured. Are you doing it on purpose? Job dispatcher count: {count}", jobDispatchCount);
+        }
     }
 
     public async Task InvokeAsync(HttpContext httpContext,
@@ -72,7 +84,8 @@ public class DotNetCounterMiddleware
 
                 // TODO: Return better error
                 httpContext.Response.StatusCode = (int)HttpStatusCode.PreconditionFailed;
-                await httpContext.Response.WriteAsJsonAsync(new {
+                await httpContext.Response.WriteAsJsonAsync(new
+                {
                     Message = "No valid dispatcher to handle jobs that doesn't belong to the current instance. Configure the dotnet-counter pipeline with proper job dispatcher first.",
                     StatusCode = httpContext.Response.StatusCode,
                 }, cancellationToken).ConfigureAwait(false);
