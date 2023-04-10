@@ -69,6 +69,13 @@ public class DotNetCounterMiddleware
             if (_jobDispatchers.Count() == 0)
             {
                 _logger.LogWarning("Got job doesn't belong to the current instance but no active job dispatcher. Have you forgot to register the job dispatchers?");
+
+                // TODO: Return better error
+                httpContext.Response.StatusCode = (int)HttpStatusCode.PreconditionFailed;
+                await httpContext.Response.WriteAsJsonAsync(new {
+                    Message = "No valid dispatcher to handle jobs that doesn't belong to the current instance. Configure the dotnet-counter pipeline with proper job dispatcher first.",
+                    StatusCode = httpContext.Response.StatusCode,
+                }, cancellationToken).ConfigureAwait(false);
                 return;
             }
             await DispatchJobsAsync(body, cancellationToken).ConfigureAwait(false);
@@ -78,7 +85,6 @@ public class DotNetCounterMiddleware
             // Otherwise, execute it immediately
             await ExecuteJobAsync(httpContext, body, cancellationToken).ConfigureAwait(false);
         }
-
 
         // Skip calling the next delegate/middleware in the pipeline, because this is a terminal.
         // await _next(context);
