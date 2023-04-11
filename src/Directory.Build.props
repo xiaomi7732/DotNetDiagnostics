@@ -12,7 +12,7 @@
 
   <!-- Properties for NuGet packages -->
   <PropertyGroup>
-    <PackageVersion>1.0.0-beta3</PackageVersion>
+    <PackageVersion>1.0.0-beta4</PackageVersion>
     <Description>Integrate .NET diagnostics tools into your code and seamlessly deliver results to multiple destinations.</Description>
     <Authors>xiaomi7732</Authors>
     <Company>CodeWithSaar</Company>
