@@ -54,7 +54,7 @@ public sealed class JobMatcherRunner<T> : BackgroundService
             }
             else
             {
-                await Task.Delay(TimeSpan.FromSeconds(1));
+                await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
             }
         }
     }
