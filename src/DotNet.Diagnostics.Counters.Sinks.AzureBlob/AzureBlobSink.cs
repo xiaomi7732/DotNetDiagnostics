@@ -34,6 +34,7 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
     public AzureBlobSink(
         IPayloadWriter payloadWriter,
         WebAppContext webAppContext,
+        AzureBlobClientBuilder blobClientBuilder,
         IOptions<AzureBlobSinkOptions> options,
         ILogger<AzureBlobSink> logger)
     {
@@ -42,25 +43,11 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
         _webAppContext = webAppContext ?? throw new ArgumentNullException(nameof(webAppContext));
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
 
-        BlobServiceClient blobServiceClient;
-        if (!string.IsNullOrEmpty(_options.ConnectionString))
+        if (blobClientBuilder is null)
         {
-            blobServiceClient = new BlobServiceClient(_options.ConnectionString);
+            throw new ArgumentNullException(nameof(blobClientBuilder));
         }
-        else
-        {
-            if (_options.ServiceUri is null)
-            {
-                throw new InvalidOperationException("Connection string or ServiceUri can't both be null. Did you miss some configuration?");
-            }
-
-            DefaultAzureCredentialOptions defaultAzureCredentialOptions = new DefaultAzureCredentialOptions()
-            {
-                ManagedIdentityClientId = _options.ManagedIdentityClientId,
-                ExcludeInteractiveBrowserCredential = true,
-            };
-            blobServiceClient = new BlobServiceClient(_options.ServiceUri, new DefaultAzureCredential(defaultAzureCredentialOptions));
-        }
+        BlobServiceClient blobServiceClient = blobClientBuilder.WithAzureBlobOptions(_options).Build();
         _blobContainerClient = blobServiceClient.GetBlobContainerClient(_options.ContainerName);
     }
 

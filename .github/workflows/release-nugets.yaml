@@ -15,12 +15,13 @@ jobs:
       matrix:
         project: [
           "src/DotNet.Diagnostics.Core/DotNet.Diagnostics.Core.csproj",
-          "src/DotNet.Diagnostics.Counters/DotNet.Diagnostics.Counters.csproj",
-          "src/DotNet.Diagnostics.Counters.WebEndpoints/DotNet.Diagnostics.Counters.WebEndpoints.csproj",
-          "src/DotNet.Diagnostics.Counters.Sinks.LocalFile/DotNet.Diagnostics.Counters.Sinks.LocalFile.csproj",
-          "src/DotNet.Diagnostics.Counters.Sinks.AzureBlob/DotNet.Diagnostics.Counters.Sinks.AzureBlob.csproj",
+          "src/DotNet.Diagnostics.Counters.ProcessStartTrigger/DotNet.Diagnostics.Counters.ProcessStartTrigger.csproj",
           "src/DotNet.Diagnostics.Counters.Sinks.ApplicationInsights/DotNet.Diagnostics.Counters.Sinks.ApplicationInsights.csproj",
-          "src/DotNet.Diagnostics.Counters.ProcessStartTrigger/DotNet.Diagnostics.Counters.ProcessStartTrigger.csproj"
+          "src/DotNet.Diagnostics.Counters.Sinks.AzureBlob/DotNet.Diagnostics.Counters.Sinks.AzureBlob.csproj",
+          "src/DotNet.Diagnostics.Counters.Sinks.LocalFile/DotNet.Diagnostics.Counters.Sinks.LocalFile.csproj",
+          "src/DotNet.Diagnostics.Counters.WebEndpoints/DotNet.Diagnostics.Counters.WebEndpoints.csproj",
+          "src/DotNet.Diagnostics.Counters/DotNet.Diagnostics.Counters.csproj",
+          "src/DotNet.Diagnostics.JobDispatchers.AzureBlob/DotNet.Diagnostics.JobDispatchers.AzureBlob.csproj"
         ]
     runs-on: ubuntu-latest
     steps:

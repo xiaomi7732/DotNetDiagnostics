@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>OpenDotNetDiagnostics.JobDispatchers.AzureBlob</PackageId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DotNet.Diagnostics.Core\DotNet.Diagnostics.Core.csproj" />
+    <ProjectReference Include="..\DotNet.Diagnostics.Counters\DotNet.Diagnostics.Counters.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.Storage.Blobs" Version="$(Azure_Storage_Blobs_Version)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="../DotNet.Diagnostics.Core.AzureBlob/AzureBlobClientBuilder.cs" Link="AzureBlobClientBuilder.cs" />
+  </ItemGroup>
+
+</Project>

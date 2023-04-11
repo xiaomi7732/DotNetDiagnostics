@@ -6,6 +6,7 @@
     <ProjectReference Include="..\..\src\DotNet.Diagnostics.Counters.Sinks.AzureBlob\DotNet.Diagnostics.Counters.Sinks.AzureBlob.csproj" />
     <ProjectReference Include="..\..\src\DotNet.Diagnostics.Counters.Sinks.ApplicationInsights\DotNet.Diagnostics.Counters.Sinks.ApplicationInsights.csproj" />
     <ProjectReference Include="..\..\src\DotNet.Diagnostics.Counters.ProcessStartTrigger\DotNet.Diagnostics.Counters.ProcessStartTrigger.csproj" />
+    <ProjectReference Include="..\..\src\DotNet.Diagnostics.JobDispatchers.AzureBlob\DotNet.Diagnostics.JobDispatchers.AzureBlob.csproj" />
   </ItemGroup>
 
   <ItemGroup>

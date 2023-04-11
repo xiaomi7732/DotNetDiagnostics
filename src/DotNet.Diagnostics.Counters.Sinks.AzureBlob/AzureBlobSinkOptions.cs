@@ -1,22 +1,10 @@
+using DotNet.Diagnostics.Core;
+
 namespace DotNet.Diagnostics.Counters.Sinks.AzureBlob;
 
-public class AzureBlobSinkOptions
+public class AzureBlobSinkOptions : AzureBlobOptions
 {
     public const string DefaultSectionName="AzureBlob";
-
-    /// <summary>
-    /// Gets or sets the connection string to the Azure Blob Storage.
-    public string? ConnectionString { get; set; }
-
-    /// <summary>
-    /// Gets or sets the client id for managed identity.
-    /// </summary>
-    public string? ManagedIdentityClientId { get; set; }
-
-    /// <summary>
-    /// Gets or sets the service Uri for the storage.
-    /// </summary>
-    public Uri? ServiceUri { get; set; }
 
     /// <summary>
     /// Gets or sets the container name for the sink output.
