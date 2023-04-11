@@ -14,7 +14,7 @@ public class DotNetCounterMiddleware
     private readonly DotNetCountersWebhookOptions _options;
     private readonly IDotNetCountersClient _dotnetCountersClient;
     private readonly IEnumerable<IJobDispatcher<DotNetCountersJobDetail>> _jobDispatchers;
-    private readonly EnvVarFilter _jobFilter;
+    private readonly EnvVarMatcher _jobFilter;
     private readonly ILogger _logger;
     private readonly JsonSerializerOptions _jsonSerializationOptions;
 
@@ -22,7 +22,7 @@ public class DotNetCounterMiddleware
         IOptions<DotNetCountersWebhookOptions> dotnetCountersWebhookOptions,
         IDotNetCountersClient dotnetCountersClient,
         IEnumerable<IJobDispatcher<DotNetCountersJobDetail>> jobDispatchers,
-        EnvVarFilter jobFilter,
+        EnvVarMatcher jobFilter,
         ILogger<DotNetCounterMiddleware> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -120,15 +120,19 @@ public class DotNetCounterMiddleware
 
     private async Task ExecuteJobAsync(HttpContext httpContext, RequestBodyContract body, CancellationToken cancellationToken)
     {
-        if (body.IsEnabled)
+        await ExecuteJobAsync(body.IsEnabled, cancellationToken).ConfigureAwait(false);
+        await httpContext.Response.WriteAsJsonAsync(new ResponseBodyContract() { IsEnabled = body.IsEnabled }).ConfigureAwait(false);
+    }
+
+    private Task ExecuteJobAsync(bool isEnabled, CancellationToken cancellationToken)
+    {
+        if(isEnabled)
         {
-            await _dotnetCountersClient.EnableAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+            return _dotnetCountersClient.EnableAsync(cancellationToken: cancellationToken);
         }
         else
         {
-            await _dotnetCountersClient.DisableAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+            return _dotnetCountersClient.DisableAsync(cancellationToken: cancellationToken);
         }
-
-        await httpContext.Response.WriteAsJsonAsync(new ResponseBodyContract() { IsEnabled = body.IsEnabled }).ConfigureAwait(false);
     }
 }

@@ -1,9 +1,9 @@
 namespace DotNet.Diagnostics.Core.Utilities;
 
-public sealed class EnvVarFilter
+public sealed class EnvVarMatcher
 {
-    public static EnvVarFilter Instance { get; } = new EnvVarFilter();
-    private EnvVarFilter()
+    public static EnvVarMatcher Instance { get; } = new EnvVarMatcher();
+    private EnvVarMatcher()
     { }
 
     public bool MatchAll(IDictionary<string, string> filters) => filters.All(pair => Match(pair.Key, pair.Value));

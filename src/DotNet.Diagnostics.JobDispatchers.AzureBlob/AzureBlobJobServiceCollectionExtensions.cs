@@ -1,4 +1,6 @@
 using DotNet.Diagnostics.Core;
+using DotNet.Diagnostics.Counters;
+using DotNet.Diagnostics.JobDispatchers;
 using DotNet.Diagnostics.JobDispatchers.AzureBlob;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,10 +34,15 @@ public static class AzureBlobJobServiceCollectionExtensions
             configuration.GetSection(baseSectionName).GetSection(jobsSectionName).GetSection(sectionName).Bind(opt);
         });
 
+        services.TryAddSingleton<JobNameProvider>(_ => JobNameProvider.Instance);
+
         services.TryAddSingleton<JsonSerializerOptionsProvider>(_ => JsonSerializerOptionsProvider.Instance);
         services.AddSingleton<TokenCredential<AzureBlobJobDispatcher>, AzureBlobJobTokenCredential>();
         services.TryAddTransient<AzureBlobClientBuilder>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IJobDispatcher<DotNetCountersJobDetail>, AzureBlobJobDispatcher>());
+
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IJobMatcher<DotNetCountersJobDetail>, AzureBlobJobMatcher>());
+        services.AddHostedService<JobMatcherRunner<DotNetCountersJobDetail>>();
         return services;
     }
 }

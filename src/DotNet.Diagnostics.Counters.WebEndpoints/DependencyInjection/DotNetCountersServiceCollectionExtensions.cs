@@ -24,7 +24,7 @@ public static class DotNetCountersServiceCollectionExtensions
 
             services.TryAddSingleton<DotNetCountEventCounterManager>();
             services.TryAddSingleton<IDotNetCountersClient, DotNetCountersClient>();
-            services.TryAddSingleton<EnvVarFilter>(_ => EnvVarFilter.Instance);
+            services.TryAddSingleton<EnvVarMatcher>(_ => EnvVarMatcher.Instance);
         });
 
         return new DotNetCountersPipelineBuilder(actions, services, sectionName);
