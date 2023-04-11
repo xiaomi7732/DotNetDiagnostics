@@ -6,6 +6,10 @@
   <PropertyGroup>
     <PackageId>OpenDotNetDiagnostics.Counters.Sinks.AzureBlob</PackageId>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../DotNet.Diagnostics.Core.AzureBlob/AzureBlobClientBuilder.cs" Link="AzureBlobClientBuilder.cs" />
+  </ItemGroup>
   
   <ItemGroup>
     <PackageReference Include="Azure.Storage.Blobs" Version="$(Azure_Storage_Blobs_Version)" />

@@ -23,12 +23,12 @@ public class AzureBlobJobDispatcher : IJobDispatcher<DotNetCountersJobDetail>
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
-
+        _jsonSerializerOptionsProvider = jsonSerializerOptionsProvider ?? throw new ArgumentNullException(nameof(jsonSerializerOptionsProvider));
+        
         if (blobClientBuilder is null)
         {
             throw new ArgumentNullException(nameof(blobClientBuilder));
         }
-        _jsonSerializerOptionsProvider = jsonSerializerOptionsProvider ?? throw new ArgumentNullException(nameof(jsonSerializerOptionsProvider));
         BlobServiceClient blobServiceClient = blobClientBuilder.WithAzureBlobOptions(_options).Build();
         _blobContainerClient = blobServiceClient.GetBlobContainerClient(_options.ContainerName);
     }

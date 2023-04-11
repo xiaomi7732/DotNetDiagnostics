@@ -19,7 +19,6 @@
     <PackageReference Include="Azure.Storage.Blobs" Version="$(Azure_Storage_Blobs_Version)" />
   </ItemGroup>
 
-
   <ItemGroup>
     <Compile Include="../DotNet.Diagnostics.Core.AzureBlob/AzureBlobClientBuilder.cs" Link="AzureBlobClientBuilder.cs" />
   </ItemGroup>

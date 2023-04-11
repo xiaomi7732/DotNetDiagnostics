@@ -33,6 +33,7 @@ public static class AzureBlobSinkServiceCollectionExtensions
         services.AddSingleton<ISink<IDotNetCountersClient, ICounterPayload>>(p => p.GetRequiredService<AzureBlobSink>());
         services.AddHostedService<SinkBackgroundService<AzureBlobSink>>();
         services.TryAddSingleton<IPayloadWriter, CSVPayloadWriter>();
+        services.TryAddTransient<AzureBlobClientBuilder>();
 
         return services;
     }
