@@ -2,7 +2,7 @@
 
 `dotnet-counters` is good at monitoring the system continuously for metrics like CPU usage, thread queue and so on. In this example, we will use it to monitor CPU usage.
 
-## Result
+## What to expect
 
 Check out [Counters_2023051100.xlsx](./results/Counters_2023051100.xlsx) for a result. It looks like this:
 
@@ -35,7 +35,7 @@ To get the result by yourself, start by cloning this repo and navigate to `/exam
     app.MapDotNetCounters("/dotnet-counters");
     ```
 
-1. We also want to write the output to a local file (we will talk about save it to other places). To do that, add a file sink:
+1. We also want to write the output to a local file (we will talk about save it to other places in a bit). To do that, add a file sink:
 
     ```shell
     dotnet add package OpenDotNetDiagnostics.Counters.Sinks.LocalFile --version 1.0.0-beta4
@@ -114,16 +114,17 @@ To get the result by yourself, start by cloning this repo and navigate to `/exam
 }
 ```
 
-See [appsettings.Development.json](../WebAPIExample/appsettings.Development.json) for a full example. Restart the app and update the body to enable or disable `dotnet-counters`:
+See [appsettings.Development.json](../WebAPIExample/appsettings.Development.json) for a full example. Restart the app and update **the body** to use the new invoking secret:
 
 ```json
+// Use this as request body:
 {
     "isEnabled": true,
     "invokingSecret": "mysecret"
 }
 ```
 
-And if the secret doesn't match, you will get the following error message in the response:
+And if the secret doesn't match, you would get the following error message in the response:
 
 ```json
 {
@@ -136,8 +137,46 @@ And if the secret doesn't match, you will get the following error message in the
 
 Output to csv file in local file system is good for debugging, it is not always accessible when the application is deployed to remote environment - Azure App Service, Kubernetes cluster...
 
-// TODO: Add steps
+Following these steps to output the result file to Azure Storage.
+
+1. Add the NuGet package for the sink:
+
+    ```shell
+    dotnet add package OpenDotNetDiagnostics.Counters.Sinks.AzureBlob --version 1.0.0-beta4
+    ```
+
+1. Register the service in [Program.cs](./Program.cs):
+
+    ```csharp
+    builder.Services.AddDotNetCounters()
+        .WithLocalFileSink()
+        .WithAzureBlobSink()
+        .Register(); 
+    ```
+
+1. You will need to provide configurations to grant permission for your applications to write the Azure Storage. For example:
+
+    ```jsonc
+    {
+        "DotNetCounters": {
+            "InvokingSecret": "mysecret",
+            "Sinks": {
+                "AzureBlob": {
+                    "ConnectionString": "Connection string to your Azure Storage"
+                }
+            }
+        }
+    }
+    ```
+
+    Tips: connection string is a convenient way to get started. For better security, it is recommended to use a passwordless solution like managed identity. For more details, please refer to [Using Azure Blob for Data File Output](https://github.com/xiaomi7732/DotNetDiagnostics/wiki/Using-Azure-Blob-for-Data-File-Output).
 
 ## Output to Application Insights for advanced query
 
-// TODO: Add steps
+By outputting the data to application insights, you will have the capability of advanced querying, charting, alerts, etc.
+
+The steps are similar, add the [NuGet package](https://www.nuget.org/packages/OpenDotNetDiagnostics.Counters.Sinks.ApplicationInsights), register the services for both application insights, and the sink, and then configure the connection string for telemetry ingestion.
+
+Please follow [this wiki](https://github.com/xiaomi7732/DotNetDiagnostics/wiki/Using-Application-Insights-Data-Output) for how to output data to Application Insights and run the queries to the data.
+
+Feel free to file issues if there's clarification needed.
