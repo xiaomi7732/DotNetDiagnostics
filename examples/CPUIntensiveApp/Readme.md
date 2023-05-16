@@ -10,6 +10,16 @@ Check out [Counters_2023051100.xlsx](./results/Counters_2023051100.xlsx) for a r
 
 As we can see, there's a constant level of CPU usage captured by `dotnet-counters`.
 
+## What's in this example
+
+In this post, you will see:
+
+* How to build a simple pipeline to output `dotnet-counters` data to a local file
+* How to customize the invoking secret
+* How to output the same data to Azure Storage
+* How to output the same data to Application Insights
+* How to start `dotnet-counters` at the beginning of your application
+
 ## Prepare
 
 To get the result by yourself, start by cloning this repo and navigate to `/examples/CPUIntensiveApp`.
