@@ -180,3 +180,25 @@ The steps are similar, add the [NuGet package](https://www.nuget.org/packages/Op
 Please follow [this wiki](https://github.com/xiaomi7732/DotNetDiagnostics/wiki/Using-Application-Insights-Data-Output) for how to output data to Application Insights and run the queries to the data.
 
 Feel free to file issues if there's clarification needed.
+
+## Start `dotnet-counters` at the beginning of your application
+
+To start `dotnet-counters` at the beginning of your application, we will leverage a trigger of `ProcessStart`. Here's how to do it.
+
+1. Add NuGet package:
+
+    ```shell
+    dotnet add package OpenDotNetDiagnostics.Counters.Triggers.ProcessStart --version 1.0.0-beta4
+    ```
+
+1. Register the service in [Program.cs](./Program.cs):
+
+    ```csharp
+    builder.Services
+        .AddDotNetCounters()
+        .WithLocalFileSink()
+        .WithProcessStartTrigger()  // Enables dotnet-counters upon process start.
+        .Register();
+    ```
+
+And the counters will be enabled at the beginning of the application.
