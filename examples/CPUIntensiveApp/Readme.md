@@ -1,8 +1,8 @@
-# Monitor CPU Usage by dotnet-counters
+# Monitor CPU Usage by dotnet-counters <!-- omit in toc -->
 
 `dotnet-counters` is good at monitoring the system continuously for metrics like CPU usage, thread queue and so on. In this example, we will use it to monitor CPU usage.
 
-## What to expect
+## What to expect <!-- omit in toc -->
 
 Check out [Counters_2023051100.xlsx](./results/Counters_2023051100.xlsx) for a result. It looks like this:
 
@@ -10,21 +10,22 @@ Check out [Counters_2023051100.xlsx](./results/Counters_2023051100.xlsx) for a r
 
 As we can see, there's a constant level of CPU usage captured by `dotnet-counters`.
 
-## What's in this example
+## What's in this example <!-- omit in toc -->
 
 In this post, you will see:
 
-* How to build a simple pipeline to output `dotnet-counters` data to a local file
-* How to customize the invoking secret
-* How to output the same data to Azure Storage
-* How to output the same data to Application Insights
-* How to start `dotnet-counters` at the beginning of your application
+- [Setup a basic pipeline](#setup-a-basic-pipeline)
+- [Run the application](#run-the-application)
+- [Customize invoking secret](#customize-invoking-secret)
+- [Output to Azure Storage for remote storage](#output-to-azure-storage-for-remote-storage)
+- [Output to Application Insights for advanced query](#output-to-application-insights-for-advanced-query)
+- [Start `dotnet-counters` at the beginning of your application](#start-dotnet-counters-at-the-beginning-of-your-application)
 
-## Prepare
+## Prepare <!-- omit in toc -->
 
 To get the result by yourself, start by cloning this repo and navigate to `/examples/CPUIntensiveApp`.
 
-## Add NuGet Packages and register the services
+## Setup a basic pipeline
 
 1. To form up a pipeline, add the following NuGet packages:
 
