@@ -13,7 +13,7 @@ Our approach prioritizes the developer experience and therefore requires some co
 Assuming you have an ASP.NET Core WebAPI project:
 
 1. Add NuGet packages:
-    * [OpenDotNetDiagnostics.Counters.WebEndpoints](OpenDotNetDiagnostics.Counters.WebEndpoints) - to expose an endpoint for enabling/disabling `dotnet-counters`.
+    * [OpenDotNetDiagnostics.Counters.WebEndpoints](https://www.nuget.org/packages/OpenDotNetDiagnostics.Counters.WebEndpoints) - to expose an endpoint for enabling/disabling `dotnet-counters`.
     * [OpenDotNetDiagnostics.Counters.Sinks.LocalFile](https://www.nuget.org/packages/OpenDotNetDiagnostics.Counters.Sinks.LocalFile) - to export the data to a local file (and in app service, to application logs folder).
 
 2. Instrument the code to register the proper service and map the end point, for example:
