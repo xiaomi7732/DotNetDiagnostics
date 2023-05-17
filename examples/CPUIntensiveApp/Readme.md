@@ -18,7 +18,7 @@ In this post, you will see:
 - [Run the application](#run-the-application)
 - [Customize invoking secret](#customize-invoking-secret)
 - [Output to Azure Storage for remote storage](#output-to-azure-storage-for-remote-storage)
-- [Output to Application Insights for advanced query](#output-to-application-insights-for-advanced-query)
+- [Output to Application Insights for advanced query and more](#output-to-application-insights-for-advanced-query-and-more)
 - [Start `dotnet-counters` at the beginning of your application](#start-dotnet-counters-at-the-beginning-of-your-application)
 
 ## Prepare <!-- omit in toc -->
@@ -127,7 +127,7 @@ To get the result by yourself, start by cloning this repo and navigate to `/exam
 
 See [appsettings.Development.json](../WebAPIExample/appsettings.Development.json) for a full example. Restart the app and update **the body** to use the new invoking secret:
 
-```json
+```jsonc
 // Use this as request body:
 {
     "isEnabled": true,
@@ -182,7 +182,7 @@ Following these steps to output the result file to Azure Storage.
 
     Tips: connection string is a convenient way to get started. For better security, it is recommended to use a passwordless solution like managed identity. For more details, please refer to [Using Azure Blob for Data File Output](https://github.com/xiaomi7732/DotNetDiagnostics/wiki/Using-Azure-Blob-for-Data-File-Output).
 
-## Output to Application Insights for advanced query
+## Output to Application Insights for advanced query and more
 
 By outputting the data to application insights, you will have the capability of advanced querying, charting, alerts, etc.
 
