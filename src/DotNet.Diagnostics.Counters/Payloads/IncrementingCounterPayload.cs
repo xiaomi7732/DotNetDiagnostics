@@ -8,7 +8,8 @@ internal class IncrementingCounterPayload : ICounterPayload
 
     public double Value { get; init; }
 
-    public string CounterType { get; init; } = "Sum";
+    internal CounterType CounterTypeInternal { get; } = DotNet.Diagnostics.Counters.CounterType.Sum;
+    public string CounterType => CounterTypeInternal.ToString();
 
     public string Provider { get; init; } = default!;
 

@@ -15,7 +15,8 @@ internal class CounterPayload : ICounterPayload
 
     public float Interval { get; init; }
 
-    public string CounterType { get; init; } = default!;
+    internal CounterType CounterTypeInternal { get; } = DotNet.Diagnostics.Counters.CounterType.Mean;
+    public string CounterType => CounterTypeInternal.ToString();
 
     public string Provider { get; init; } = default!;
 
