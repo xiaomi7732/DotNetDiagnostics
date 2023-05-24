@@ -1,3 +1,4 @@
+using DotNet.Diagnostics.Core;
 using DotNet.Diagnostics.Core.Utilities;
 using DotNet.Diagnostics.Counters;
 using DotNet.Diagnostics.Counters.WebEndpoints;
@@ -25,6 +26,9 @@ public static class DotNetCountersServiceCollectionExtensions
             services.TryAddSingleton<DotNetCountEventCounterManager>();
             services.TryAddSingleton<IDotNetCountersClient, DotNetCountersClient>();
             services.TryAddSingleton<EnvVarMatcher>(_ => EnvVarMatcher.Instance);
+
+            services.TryAddSingleton<ICounterPayloadSet>(_ => EndpointSink.Instance);
+            services.TryAddSingleton<ISink<IDotNetCountersClient, ICounterPayload>>(p => (ISink<IDotNetCountersClient, ICounterPayload>)p.GetRequiredService<ICounterPayloadSet>());
         });
 
         return new DotNetCountersPipelineBuilder(actions, services, sectionName);

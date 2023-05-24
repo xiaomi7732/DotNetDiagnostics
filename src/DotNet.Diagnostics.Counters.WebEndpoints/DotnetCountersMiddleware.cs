@@ -15,6 +15,7 @@ public class DotNetCounterMiddleware
     private readonly IDotNetCountersClient _dotnetCountersClient;
     private readonly IEnumerable<IJobDispatcher<DotNetCountersJobDetail>> _jobDispatchers;
     private readonly EnvVarMatcher _jobFilter;
+    private readonly ICounterPayloadSet _counterPayloadSet;
     private readonly ILogger _logger;
     private readonly JsonSerializerOptions _jsonSerializationOptions;
 
@@ -23,6 +24,7 @@ public class DotNetCounterMiddleware
         IDotNetCountersClient dotnetCountersClient,
         IEnumerable<IJobDispatcher<DotNetCountersJobDetail>> jobDispatchers,
         EnvVarMatcher jobFilter,
+        ICounterPayloadSet counterPayloadSet,
         ILogger<DotNetCounterMiddleware> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -31,6 +33,7 @@ public class DotNetCounterMiddleware
         _options = dotnetCountersWebhookOptions?.Value ?? throw new ArgumentNullException(nameof(dotnetCountersWebhookOptions));
         _dotnetCountersClient = dotnetCountersClient ?? throw new ArgumentNullException(nameof(dotnetCountersClient));
         _jobFilter = jobFilter ?? throw new ArgumentNullException(nameof(jobFilter));
+        _counterPayloadSet = counterPayloadSet ?? throw new ArgumentNullException(nameof(counterPayloadSet));
         _jsonSerializationOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
         _jobDispatchers = jobDispatchers ?? Enumerable.Empty<IJobDispatcher<DotNetCountersJobDetail>>();
 
@@ -54,7 +57,8 @@ public class DotNetCounterMiddleware
     {
         ArgumentNullException.ThrowIfNull(httpContext);
 
-        if (!string.Equals(httpContext.Request.Method, HttpMethod.Put.Method, StringComparison.Ordinal))
+        if (!IsMethod(httpContext.Request, HttpMethod.Put) &&
+            !IsMethod(httpContext.Request, HttpMethod.Get))
         {
             throw new InvalidOperationException($"Unsupported HttpMethod: {httpContext.Request.Method}");
         }
@@ -75,6 +79,46 @@ public class DotNetCounterMiddleware
             return;
         }
 
+        if (IsMethod(httpContext.Request, HttpMethod.Get))
+        {
+            await HandleGetRequestAsync(httpContext, body, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (IsMethod(httpContext.Request, HttpMethod.Put))
+        {
+            await HandlePutRequestAsync(httpContext, body, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        // Skip calling the next delegate/middleware in the pipeline, because this is a terminal.
+        // await _next(context);
+    }
+
+    private async Task HandleGetRequestAsync(HttpContext httpContext, RequestBodyContract _, CancellationToken cancellationToken)
+    {
+        // TODO: Get serializer configuration
+        // TODO: Error handling
+
+        if (_counterPayloadSet.Data.Count == 0)
+        {
+            httpContext.Response.StatusCode = (int)HttpStatusCode.NoContent;
+            return;
+        }
+
+        try
+        {
+            await httpContext.Response.WriteAsJsonAsync<ICounterPayloadSet>(_counterPayloadSet, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            httpContext.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
+            await httpContext.Response.WriteAsJsonAsync(ex.Message, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task HandlePutRequestAsync(HttpContext httpContext, RequestBodyContract body, CancellationToken cancellationToken)
+    {
         if (body.EnvVarFilters is not null && !_jobFilter.MatchAll(body.EnvVarFilters))
         {
             // Dispatch the job since it doesn't belong to this instance;
@@ -98,9 +142,6 @@ public class DotNetCounterMiddleware
             // Otherwise, execute it immediately
             await ExecuteJobAsync(httpContext, body, cancellationToken).ConfigureAwait(false);
         }
-
-        // Skip calling the next delegate/middleware in the pipeline, because this is a terminal.
-        // await _next(context);
     }
 
     private async Task DispatchJobsAsync(RequestBodyContract body, CancellationToken cancellationToken)
@@ -126,7 +167,7 @@ public class DotNetCounterMiddleware
 
     private Task ExecuteJobAsync(bool isEnabled, CancellationToken cancellationToken)
     {
-        if(isEnabled)
+        if (isEnabled)
         {
             return _dotnetCountersClient.EnableAsync(cancellationToken: cancellationToken);
         }
@@ -135,4 +176,7 @@ public class DotNetCounterMiddleware
             return _dotnetCountersClient.DisableAsync(cancellationToken: cancellationToken);
         }
     }
+
+    private bool IsMethod(HttpRequest request, HttpMethod compareTo)
+        => string.Equals(request.Method, compareTo.Method, StringComparison.Ordinal);
 }
