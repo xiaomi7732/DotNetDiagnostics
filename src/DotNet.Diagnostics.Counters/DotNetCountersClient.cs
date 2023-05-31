@@ -171,7 +171,7 @@ public sealed class DotNetCountersClient : IDotNetCountersClient, IAsyncDisposab
             IDictionary<string, object> payloadFields = (IDictionary<string, object>)(payloadVal["Payload"]);
 
             string? metricsName = payloadFields["Name"].ToString();
-            if(string.IsNullOrEmpty(metricsName) || !IsEnabled(traceEventObject.ProviderName, metricsName))
+            if (string.IsNullOrEmpty(metricsName) || !IsEnabled(traceEventObject.ProviderName, metricsName))
             {
                 // The metrics doesn't have a name or it is not there in the filter.
                 return;
@@ -209,7 +209,7 @@ public sealed class DotNetCountersClient : IDotNetCountersClient, IAsyncDisposab
         }
     }
 
-    private IEnumerable<EventPipeProvider> GetEventPipeProviders() 
+    private IEnumerable<EventPipeProvider> GetEventPipeProviders()
         => _eventCounterManager.EventCounters.Select(item => item.ToEventPipeProvider()).OfType<EventPipeProvider>();
 
     public async ValueTask DisposeAsync()
@@ -221,13 +221,13 @@ public sealed class DotNetCountersClient : IDotNetCountersClient, IAsyncDisposab
 
     private bool IsEnabled(string providerName, string metricsName)
     {
-        if(string.IsNullOrEmpty(providerName))
+        if (string.IsNullOrEmpty(providerName))
         {
             _logger.LogError("How can provider name be null for event pipe events?");
             return false;
         }
 
-        if(string.IsNullOrEmpty(metricsName))
+        if (string.IsNullOrEmpty(metricsName))
         {
             _logger.LogError("How can metrics name be null for event counter events?");
             return false;
