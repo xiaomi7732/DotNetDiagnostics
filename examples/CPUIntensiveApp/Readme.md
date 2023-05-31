@@ -125,14 +125,12 @@ To get the result by yourself, start by cloning this repo and navigate to `/exam
 }
 ```
 
-See [appsettings.Development.json](../WebAPIExample/appsettings.Development.json) for a full example. Restart the app and update **the body** to use the new invoking secret:
+See [appsettings.Development.json](../WebAPIExample/appsettings.Development.json) for a full example. Restart the app and update **the header** to use the new invoking secret:
 
-```jsonc
-// Use this as request body:
-{
-    "isEnabled": true,
-    "invokingSecret": "mysecret"
-}
+```ini
+...
+# new invoking secret
+x-invoking-secret: mysecret
 ```
 
 And if the secret doesn't match, you would get the following error message in the response:

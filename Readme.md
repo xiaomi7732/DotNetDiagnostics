@@ -49,17 +49,25 @@ Assuming you have an ASP.NET Core WebAPI project:
 
 5. To enable `dotnet-counters`, invoke a `HttpPUT` on the endpoint, for example:
 
-    ![Invoking dotnet-counters](./images/InvokingDotNetCounters.png)
+    * Set headers:
+        * Content-Type: application json
+        * x-invoking-secret: 1111
+
+            ![Invoking dotnet-counters](./images/InvokingDotNetCounters_headers.png)
+
+        * Use the body to control whether to enable or disable the dotnet counters:
+
+            ![Invoking dotnet-counters](./images/InvokingDotNetCounters.png)
 
     _Tips: You can turn off `dotnet-counters` at anytime by invoke another PUT request with `isEnabled` parameter set to false._
 
-1. Get the output
+6. Get the output
     * In a local environment, by default, the file is in `%tmp%`, you will have files like `Counters_2023031600.csv`;
     * In `Azure App Service`, the default output path would be `%HOME%/LogFiles/Application/`, and the file name would carry a unique id for the service instance, like this:
         * Counters_82177b41d89d4b2dce789b4903a7e0dc0a76412697ac6069b750097059c09ed7_2023031523.csv
         ![Counters Output on Kudu](./images/CountersOutputOnKudu.png)
 
-1. And you shall be able to download analysis the result in tools you already familiar with, for example, in the Excel:
+7. And you shall be able to download analysis the result in tools you already familiar with, for example, in the Excel:
 
     ![Analysis example in excel for working set](./images/DotNetCounterWorkingSetExample.png)
 
