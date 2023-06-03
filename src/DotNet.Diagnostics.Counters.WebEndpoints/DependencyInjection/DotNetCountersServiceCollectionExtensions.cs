@@ -24,6 +24,7 @@ public static class DotNetCountersServiceCollectionExtensions
             });
 
             services.TryAddSingleton<DotNetCountEventCounterManager>();
+            services.TryAddSingleton<DotnetCountersProcessIdProvider>(_ => DotnetCountersProcessIdProvider.Instance);
             services.TryAddSingleton<IDotNetCountersClient, DotNetCountersClient>();
             services.TryAddSingleton<EnvVarMatcher>(_ => EnvVarMatcher.Instance);
 

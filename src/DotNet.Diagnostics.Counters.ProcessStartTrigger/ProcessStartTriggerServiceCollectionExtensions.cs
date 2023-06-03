@@ -28,6 +28,7 @@ public static class ProcessStartTriggerServiceCollectionExtensions
             configuration.GetSection(baseSectionName).GetSection(triggersSectionName).GetSection(sectionName).Bind(opt);
         });
 
+        services.TryAddSingleton<DotnetCountersProcessIdProvider>(_ => DotnetCountersProcessIdProvider.Instance);
         services.TryAddSingleton<IDotNetCountersClient, DotNetCountersClient>();
         services.AddHostedService<ProcessStartTrigger>();
 
