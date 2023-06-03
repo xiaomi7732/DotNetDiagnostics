@@ -7,7 +7,13 @@ public sealed class DotnetCountersProcessIdProvider
     private DotnetCountersProcessIdProvider()
     {
     }
+
     public static DotnetCountersProcessIdProvider Instance { get; } = new DotnetCountersProcessIdProvider();
+
+    /// <summary>
+    /// Raises when process id changed.
+    /// </summary>
+    public event EventHandler<int?>? ProcessChanged;
 
     /// <summary>
     /// Get the target process id for .net counters.
@@ -22,10 +28,20 @@ public sealed class DotnetCountersProcessIdProvider
     {
         lock (_lock)
         {
-            CurrentProcessId = newValue;
+            if(CurrentProcessId != newValue)
+            {
+                CurrentProcessId = newValue;
+                RaiseProcessIdChanged(newValue);
+            }
+
             return CurrentProcessId;
         }
     }
 
     internal void RemoveCurrentProcessId() => SetCurrentProcessId(null);
+
+    private void RaiseProcessIdChanged(int? newValue)
+    {
+        ProcessChanged?.Invoke(this, newValue);
+    }
 }
