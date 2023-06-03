@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using System.Text.Json;
 using DotNet.Diagnostics.Core;
@@ -243,7 +244,7 @@ public class DotNetCounterMiddleware
     {
         if (isEnabled)
         {
-            return _dotnetCountersClient.EnableAsync(cancellationToken: cancellationToken);
+            return _dotnetCountersClient.EnableAsync(Process.GetCurrentProcess().Id, cancellationToken: cancellationToken);
         }
         else
         {

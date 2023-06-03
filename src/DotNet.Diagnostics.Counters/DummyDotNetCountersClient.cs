@@ -1,4 +1,3 @@
-using DotNet.Diagnostics.Core;
 using Microsoft.Extensions.Logging;
 
 namespace DotNet.Diagnostics.Counters;
@@ -18,7 +17,7 @@ public class DummyDotNetCountersClient : IDotNetCountersClient
         return Task.FromResult(false);
     }
 
-    public Task<bool> EnableAsync(CancellationToken cancellationToken)
+    public Task<bool> EnableAsync(int processId, CancellationToken cancellationToken)
     {
         _logger.LogInformation("DotNet counters enabled.");
         return Task.FromResult(true);

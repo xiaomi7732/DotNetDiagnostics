@@ -10,19 +10,22 @@ namespace DotNet.Diagnostics.Counters;
 public sealed class DotNetCountersClient : IDotNetCountersClient, IAsyncDisposable
 {
     private bool _isEnabled = false;
+
     private readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
-    private readonly DiagnosticsClient _diagnosticsClient;
     private EventPipeSession? _eventPipeSession;
     private EventPipeEventSource? _eventPipeEventSource;
     private Stream? _outputStream;
     private readonly DotNetCountersOptions _options;
     private readonly IEnumerable<ISink<IDotNetCountersClient, ICounterPayload>> _outputSinks;
     private readonly DotNetCountEventCounterManager _eventCounterManager;
+    private readonly DotnetCountersProcessIdProvider _dotnetCountersProcessIdProvider;
+
     private readonly ILogger _logger;
 
     public DotNetCountersClient(
         IEnumerable<ISink<IDotNetCountersClient, ICounterPayload>>? outputSinks,
         DotNetCountEventCounterManager eventCounterManager,
+        DotnetCountersProcessIdProvider dotnetCountersProcessIdProvider,
         IOptions<DotNetCountersOptions> options,
         ILogger<DotNetCountersClient> logger)
     {
@@ -30,7 +33,7 @@ public sealed class DotNetCountersClient : IDotNetCountersClient, IAsyncDisposab
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
 
         _eventCounterManager = eventCounterManager ?? throw new ArgumentNullException(nameof(eventCounterManager));
-
+        _dotnetCountersProcessIdProvider = dotnetCountersProcessIdProvider;
         _outputSinks = outputSinks ?? Enumerable.Empty<ISink<IDotNetCountersClient, ICounterPayload>>();
         if (!_outputSinks.Any())
         {
@@ -51,8 +54,6 @@ public sealed class DotNetCountersClient : IDotNetCountersClient, IAsyncDisposab
         {
             throw new InvalidOperationException($"Can't start dotnet-counter for process {processId}");
         }
-
-        _diagnosticsClient = new DiagnosticsClient(processId);
     }
 
     public async Task<bool> DisableAsync(CancellationToken cancellationToken)
@@ -111,13 +112,14 @@ public sealed class DotNetCountersClient : IDotNetCountersClient, IAsyncDisposab
         }
         finally
         {
+            _dotnetCountersProcessIdProvider.RemoveCurrentProcessId();
             _lock.Release();
             await DisposeCoreAsync().ConfigureAwait(false);
         }
         return false;
     }
 
-    public async Task<bool> EnableAsync(CancellationToken cancellationToken)
+    public async Task<bool> EnableAsync(int processId, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Enabling dotnet-counters...");
         await _lock.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -128,24 +130,40 @@ public sealed class DotNetCountersClient : IDotNetCountersClient, IAsyncDisposab
                 _logger.LogInformation("There is already a running dotnet-counter.");
                 return false;
             }
+
+            if (processId <= 0)
+            {
+                _logger.LogError("Can't start dotnet-counters on process with id <= 0. Actual value: {pid}", processId);
+                return false;
+            }
+
             _ = Task.Run(() =>
             {
                 try
                 {
+                    DiagnosticsClient diagnosticsClient = new DiagnosticsClient(processId);
+
                     _outputStream = new MemoryStream();
-                    _eventPipeSession = _diagnosticsClient.StartEventPipeSession(GetEventPipeProviders(), requestRundown: false, circularBufferMB: 10);
-                    _diagnosticsClient.ResumeRuntime();
+                    _eventPipeSession = diagnosticsClient.StartEventPipeSession(GetEventPipeProviders(), requestRundown: false, circularBufferMB: 10);
+                    diagnosticsClient.ResumeRuntime();
                     _eventPipeEventSource = new EventPipeEventSource(_eventPipeSession.EventStream);
                     _eventPipeEventSource.Dynamic.All += DynamicAllMonitor;
                     _logger.LogInformation("dotnet-counters enabled.");
+                    _dotnetCountersProcessIdProvider.SetCurrentProcessId(processId);
                     _eventPipeEventSource.Process();
                 }
                 catch (DiagnosticsClientException ex)
                 {
+                    _dotnetCountersProcessIdProvider.RemoveCurrentProcessId();
+                    _isEnabled = false;
+
                     _logger.LogError(ex, "Failed to start the counter session: {message}", ex.ToString());
                 }
                 catch (Exception ex)
                 {
+                    _dotnetCountersProcessIdProvider.RemoveCurrentProcessId();
+                    _isEnabled = false;
+
                     _logger.LogError(ex, "Unknown error: {message}", ex.ToString());
                 }
             }, cancellationToken);
