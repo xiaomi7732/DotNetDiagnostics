@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Azure;
 using Azure.Storage.Blobs;
@@ -164,7 +165,7 @@ public class AzureBlobJobMatcher : IJobMatcher<DotNetCountersJobDetail>
     {
         if (isEnabled)
         {
-            return _dotnetCountersClient.EnableAsync(cancellationToken: cancellationToken);
+            return _dotnetCountersClient.EnableAsync(Process.GetCurrentProcess().Id, cancellationToken: cancellationToken);
         }
         else
         {

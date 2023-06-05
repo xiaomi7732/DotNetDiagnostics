@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -31,7 +32,7 @@ public class ProcessStartTrigger : BackgroundService
 
         _logger.LogInformation("Start dotent-counter with the process, delay for {initialDelay}", _options.InitialDelay);
         await Task.Delay(_options.InitialDelay, stoppingToken).ConfigureAwait(false);
-        await _dotnetCounters.EnableAsync(stoppingToken).ConfigureAwait(false);
+        await _dotnetCounters.EnableAsync(Process.GetCurrentProcess().Id, stoppingToken).ConfigureAwait(false);
         _logger.LogDebug("Dotnet-counters started with the process.", _options.InitialDelay);
     }
 }
