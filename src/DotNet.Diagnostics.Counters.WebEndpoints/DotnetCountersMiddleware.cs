@@ -18,6 +18,7 @@ public class DotNetCounterMiddleware
     private readonly IEnumerable<IJobDispatcher<DotNetCountersJobDetail>> _jobDispatchers;
     private readonly EnvVarMatcher _jobFilter;
     private readonly ICounterPayloadSet _counterPayloadSet;
+    private readonly DotnetCountersProcessIdProvider _processIdProvider;
     private readonly ILogger _logger;
     private readonly JsonSerializerOptions _jsonSerializationOptions;
 
@@ -27,6 +28,7 @@ public class DotNetCounterMiddleware
         IEnumerable<IJobDispatcher<DotNetCountersJobDetail>> jobDispatchers,
         EnvVarMatcher jobFilter,
         ICounterPayloadSet counterPayloadSet,
+        DotnetCountersProcessIdProvider processIdProvider,
         ILogger<DotNetCounterMiddleware> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -36,6 +38,7 @@ public class DotNetCounterMiddleware
         _dotnetCountersClient = dotnetCountersClient ?? throw new ArgumentNullException(nameof(dotnetCountersClient));
         _jobFilter = jobFilter ?? throw new ArgumentNullException(nameof(jobFilter));
         _counterPayloadSet = counterPayloadSet ?? throw new ArgumentNullException(nameof(counterPayloadSet));
+        _processIdProvider = processIdProvider ?? throw new ArgumentNullException(nameof(processIdProvider));
         _jsonSerializationOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
         _jobDispatchers = jobDispatchers ?? Enumerable.Empty<IJobDispatcher<DotNetCountersJobDetail>>();
 
@@ -168,9 +171,15 @@ public class DotNetCounterMiddleware
 
     private async Task HandleGetRequestAsync(HttpContext httpContext, RequestBodyContract? body, CancellationToken cancellationToken)
     {
+        // No active dotnet-counters session.
+        if (_processIdProvider.CurrentProcessId is null)
+        {
+            httpContext.Response.StatusCode = (int)HttpStatusCode.NoContent;
+            return;
+        }
+
         // TODO: Get serializer configuration
         // TODO: Error handling
-
         if (_counterPayloadSet.Data.Count == 0)
         {
             httpContext.Response.StatusCode = (int)HttpStatusCode.NoContent;
