@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Threading.Channels;
 using Azure.Identity;
@@ -12,8 +13,12 @@ namespace DotNet.Diagnostics.Counters.Sinks.AzureBlob;
 public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload>, IAsyncDisposable
 {
     private bool _isDisposed = false;
-    private readonly Dictionary<string, MemoryStream> _cache = new Dictionary<string, MemoryStream>(StringComparer.Ordinal);
-    private string? _currentStreamKey = null;
+    private readonly ConcurrentDictionary<string, MemoryStream> _cache = new ConcurrentDictionary<string, MemoryStream>(StringComparer.Ordinal);
+
+    // Assuming there won't be to much pressure to hold to many items.
+    private const int _maxCacheSize = 100 * 1024;
+
+    // private string? _currentStreamKey = null;
 
     private readonly Channel<ICounterPayload> _workingQueue = Channel.CreateUnbounded<ICounterPayload>(new UnboundedChannelOptions()
     {
@@ -64,7 +69,6 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
         try
         {
             await AppendBlobAsync().ConfigureAwait(false);
-
         }
         finally
         {
@@ -131,53 +135,20 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
 
         try
         {
-            string blobName = GetBlobName(data.Timestamp);
-            AppendBlobClient blobClient = _blobContainerClient.GetAppendBlobClient(blobName);
+            string cacheKey = GetBlobName(data.Timestamp);
+            MemoryStream stream = _cache.GetOrAdd(cacheKey, key => new MemoryStream());
 
-            // Check existing leads to a HEAD operation, keep it minimum.
-            bool isNew = string.IsNullOrEmpty(_currentStreamKey) && !(await blobClient.ExistsAsync(cancellationToken));
-
-            // New
-            if (!_cache.ContainsKey(blobName))
+            if (stream.Length == 0)
             {
-                _logger.LogInformation("Open writing: {blobName}", blobName);
-                _currentStreamKey = blobName;
-                _cache[_currentStreamKey] = new MemoryStream();
+                await WriteHeaderAsync(stream, cancellationToken).ConfigureAwait(false);
             }
-
-            // Or switch stream
-            if (!string.IsNullOrEmpty(_currentStreamKey) && !string.Equals(_currentStreamKey, blobName, StringComparison.Ordinal))
-            {
-                try
-                {
-                    // Flush the cache before switching.
-                    await AppendBlobAsync().ConfigureAwait(false);
-                }
-                finally
-                {
-                    _logger.LogInformation("Open new file for writing: {blobName}", blobName);
-                    _currentStreamKey = blobName;
-                    _cache[blobName] = new MemoryStream();
-                }
-            }
-
-            if (string.IsNullOrEmpty(_currentStreamKey))
-            {
-                return;
-            }
-
-            MemoryStream outputCache = _cache[_currentStreamKey];
-            if (isNew)
-            {
-                await WriteHeaderAsync(outputCache, cancellationToken).ConfigureAwait(false);
-            }
-            await WriteDataAsync(outputCache, data, cancellationToken).ConfigureAwait(false);
+            await WriteDataAsync(stream, data, cancellationToken).ConfigureAwait(false);
 
             // Persistent every once a while (100K in size)
-            if (outputCache.Length > 100 * 1024)
+            if (GetTotalCacheSize() > _maxCacheSize)
             {
                 _logger.LogInformation("Persistent data to Azure Storage.");
-                await AppendBlobAsync(_currentStreamKey);
+                await AppendBlobAsync();
             }
         }
         catch (OperationCanceledException cancel) when (cancel.CancellationToken == cancellationToken)
@@ -187,8 +158,14 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
         }
         finally
         {
+            _logger.LogTrace("Release semaphore.");
             _semaphoreSlim.Release();
         }
+    }
+
+    private long GetTotalCacheSize()
+    {
+        return _cache.Values.Sum(s => s.Length);
     }
 
     private async Task AppendBlobAsync()
@@ -196,7 +173,7 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
         string[] keys = _cache.Keys.ToArray();
         foreach (string key in keys)
         {
-            await AppendBlobAsync(key);
+            await AppendBlobAsync(key).ConfigureAwait(false);
         }
     }
 
@@ -217,7 +194,7 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
                 await blobClient.AppendBlockAsync(block).ConfigureAwait(false);
                 await block.FlushAsync().ConfigureAwait(false);
                 await block.DisposeAsync().ConfigureAwait(false);
-                _cache.Remove(cacheKey);
+                _cache.TryRemove(cacheKey, out _);
                 return;
             }
             catch (Exception ex)
@@ -225,13 +202,12 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
                 if (retry == 0)
                 {
                     await block.DisposeAsync().ConfigureAwait(false);
-                    _cache.Remove(cacheKey);
+                    _cache.TryRemove(cacheKey, out _);
                     throw;
                 }
 
                 _logger.LogError(ex, "Failed persistent cache to Azure storage. Will retry.");
                 await Task.Delay(TimeSpan.FromSeconds(1));
-
             }
         }
     }
