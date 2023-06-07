@@ -2,7 +2,7 @@ using DotNet.Diagnostics.Core;
 
 namespace DotNet.Diagnostics.JobDispatchers.AzureBlob;
 
-public class AzureBlobJobOptions : AzureBlobOptions
+public class AzureBlobJobOptions : AzureBlobOptions, IJobOptions
 {
     public const string DefaultSectionName = "AzureBlob";
 
@@ -21,4 +21,9 @@ public class AzureBlobJobOptions : AzureBlobOptions
     /// Gets or sets the folder name for finished jobs.
     /// </summary>
     public string DoneFolder { get; set; } = "done";
+
+    /// <summary>
+    /// Gets or sets the expiry for jobs to the creation. Defualt to 30 seconds.
+    /// </summary>
+    public TimeSpan Expiry { get; set; } = TimeSpan.FromSeconds(30);
 }

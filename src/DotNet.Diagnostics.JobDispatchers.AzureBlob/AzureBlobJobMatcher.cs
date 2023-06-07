@@ -108,7 +108,7 @@ public class AzureBlobJobMatcher : IJobMatcher<DotNetCountersJobDetail>
             try
             {
                 BlobLease myJobLease = await myJobLeaseClient.AcquireAsync(TimeSpan.FromSeconds(30)).ConfigureAwait(false);
-                await MarkCompleteAsync(myJobLease, myJobBlobClient).ConfigureAwait(false);
+                await DeleteJobAsync(myJobLease, myJobBlobClient, cancellationToken).ConfigureAwait(false);
             }
             catch (RequestFailedException e)
             {
@@ -119,9 +119,26 @@ public class AzureBlobJobMatcher : IJobMatcher<DotNetCountersJobDetail>
         return effectiveJob;
     }
 
-    private async Task<bool> MarkCompleteAsync(BlobLease lease, BlobClient pendingJob)
+    private async Task<bool> DeleteJobAsync(BlobLease lease, BlobClient pendingJob, CancellationToken cancellationToken)
     {
-        return await pendingJob.DeleteIfExistsAsync(conditions: new BlobRequestConditions() { LeaseId = lease.LeaseId }).ConfigureAwait(false);
+        return await pendingJob.DeleteIfExistsAsync(conditions: new BlobRequestConditions() { LeaseId = lease.LeaseId }, cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task DeleteExpiredJobAsync(BlobClient blobClient, CancellationToken cancellationToken)
+    {
+        try
+        {
+            _logger.LogInformation("Trying to remove expired job.");
+            BlobLeaseClient blobLeaseClient = new BlobLeaseClient(blobClient);
+            BlobLease lease = await blobLeaseClient.AcquireAsync(TimeSpan.FromSeconds(30)).ConfigureAwait(false);
+            await DeleteJobAsync(lease, blobClient, cancellationToken).ConfigureAwait(false);
+            _logger.LogInformation("Expired job removed.");
+
+        }
+        catch (RequestFailedException e)
+        {
+            _logger.LogError(e, "Failed to remove expired job: {blobName}", blobClient.Name);
+        }
     }
 
     private async Task<(DateTime CreatedOn, DotNetCountersJobDetail JobDetail, BlobItem BlobItem)?> GetMyJobsAsync(BlobItem blobItem, CancellationToken cancellationToken)
@@ -153,6 +170,10 @@ public class AzureBlobJobMatcher : IJobMatcher<DotNetCountersJobDetail>
         if (!_jobMatcher.MatchAll(jobDetail.Filter))
         {
             _logger.LogDebug("Job {jobPath} is not for this instance.", blobItem.Name);
+            if ((DateTimeOffset.UtcNow - result.Details.LastModified) > _options.Expiry)
+            {
+                await DeleteExpiredJobAsync(blobClient, cancellationToken).ConfigureAwait(false);
+            }
             return null;
         }
 

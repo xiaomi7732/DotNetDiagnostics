@@ -12,7 +12,7 @@ public static class AzureBlobJobServiceCollectionExtensions
 {
     public static DotNetCountersPipelineBuilder WithAzureBlobJobDispatcher(
         this DotNetCountersPipelineBuilder builder,
-        string jobsSectionName = JobOptions.DefaultSectionName,
+        string jobsSectionName = IJobOptions.DefaultSectionName,
         string sectionName = AzureBlobJobOptions.DefaultSectionName)
     {
         builder.AppendAction(services =>
