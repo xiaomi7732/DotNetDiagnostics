@@ -1,0 +1,69 @@
+{
+  // See https://go.microsoft.com/fwlink/?LinkId=733558
+  // for the documentation about the tasks.json format
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build",
+      "command": "dotnet",
+      "type": "shell",
+      "args": [
+        "build",
+        // Ask dotnet build to generate full paths for file names.
+        "/property:GenerateFullPaths=true",
+        // Do not generate summary otherwise it leads to duplicate errors in Problems panel
+        "/consoleloggerparameters:NoSummary"
+      ],
+      "group": "build",
+      "presentation": {
+        "reveal": "silent"
+      },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "local publish",
+      "command": "dotnet",
+      "type": "shell",
+      "args": [
+        "publish",
+        "-c",
+        "Release",
+        // Ask dotnet build to generate full paths for file names.
+        "/property:GenerateFullPaths=true",
+        // Do not generate summary otherwise it leads to duplicate errors in Problems panel
+        "/consoleloggerparameters:NoSummary"
+      ],
+      "group": "none",
+      "presentation": {
+        "reveal": "always"
+      },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "build docker image",
+      "command": "docker",
+      "type": "shell",
+      "args": [
+        "build",
+        "-t",
+        "dotnet-diag-webapi-example:${input:imageVersion}",
+        "."
+      ],
+      "group": "build",
+      "presentation": {
+        "reveal": "always"
+      },
+      "problemMatcher": "$msCompile",
+      "dependsOn": [
+        "local publish"
+      ]
+    },
+  ],
+  "inputs": [
+    {
+      "id": "imageVersion",
+      "description": "Specify the image version",
+      "type": "promptString"
+    }
+  ]
+}

@@ -23,6 +23,15 @@ public class SinkBackgroundService<T> : BackgroundService
             await Task.Yield();
             await _sink.StartAsync(stoppingToken);
         }
+        catch (InvalidOperationException ex)
+        {
+#if DEBUG
+            _ = ex; // No warnings.
+            throw;
+#else
+            _logger.LogError(ex, "Failed to start the sink of {sinkType}.", typeof(T));
+#endif
+        }
         catch (OperationCanceledException ex) when (ex.CancellationToken == stoppingToken)
         {
             _logger.LogInformation("Sink terminated by the user.");

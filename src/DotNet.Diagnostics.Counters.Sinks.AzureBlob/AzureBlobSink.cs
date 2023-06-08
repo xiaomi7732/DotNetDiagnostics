@@ -20,11 +20,7 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
 
     // private string? _currentStreamKey = null;
 
-    private readonly Channel<ICounterPayload> _workingQueue = Channel.CreateUnbounded<ICounterPayload>(new UnboundedChannelOptions()
-    {
-        SingleReader = true,
-        SingleWriter = false,
-    });
+    private Channel<ICounterPayload>? _workingQueue = null;
 
     // This makes sure the flushing doesn't happen when the writer's writing the stream.
     private SemaphoreSlim? _semaphoreSlim = new SemaphoreSlim(1, 1);
@@ -32,9 +28,10 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
     private readonly AzureBlobSinkOptions _options;
     private readonly IPayloadWriter _payloadWriter;
     private readonly WebAppContext _webAppContext;
+    private readonly AzureBlobClientBuilder _blobClientBuilder;
     private readonly ILogger _logger;
 
-    private readonly BlobContainerClient _blobContainerClient;
+    private readonly Lazy<BlobContainerClient> _blobContainerClient;
 
     public AzureBlobSink(
         IPayloadWriter payloadWriter,
@@ -46,14 +43,14 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _payloadWriter = payloadWriter ?? throw new ArgumentNullException(nameof(payloadWriter));
         _webAppContext = webAppContext ?? throw new ArgumentNullException(nameof(webAppContext));
+        _blobClientBuilder = blobClientBuilder ?? throw new ArgumentNullException(nameof(blobClientBuilder));
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
 
-        if (blobClientBuilder is null)
+        _blobContainerClient = new Lazy<BlobContainerClient>(() =>
         {
-            throw new ArgumentNullException(nameof(blobClientBuilder));
-        }
-        BlobServiceClient blobServiceClient = blobClientBuilder.WithAzureBlobOptions(_options).Build();
-        _blobContainerClient = blobServiceClient.GetBlobContainerClient(_options.ContainerName);
+            BlobServiceClient blobServiceClient = _blobClientBuilder.WithAzureBlobOptions(_options).Build();
+            return blobServiceClient.GetBlobContainerClient(_options.ContainerName);
+        }, LazyThreadSafetyMode.ExecutionAndPublication);
     }
 
     public async Task FlushAsync(CancellationToken cancellationToken)
@@ -80,10 +77,15 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
     {
         try
         {
-            _logger.LogInformation("Ensure blob container exists: {containerName}", _blobContainerClient.Name);
-            await _blobContainerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+            _logger.LogInformation("Ensure blob container exists: {containerName}", _options.ContainerName);
+            await _blobContainerClient.Value.CreateIfNotExistsAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
             _logger.LogInformation("Blob container exists.");
 
+            _workingQueue = Channel.CreateUnbounded<ICounterPayload>(new UnboundedChannelOptions()
+            {
+                SingleReader = true,
+                SingleWriter = false,
+            });
             await StartReadingQueueAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (AuthenticationFailedException ex)
@@ -105,7 +107,7 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
         }
         catch (OperationCanceledException ex) when (ex.CancellationToken == cancellationToken)
         {
-            _workingQueue.Writer.TryComplete();
+            _workingQueue?.Writer.TryComplete();
             // No cancellation token this time.
             await PumpTheChannelAsync(default).ConfigureAwait(false);
             throw;
@@ -114,6 +116,11 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
 
     private async Task PumpTheChannelAsync(CancellationToken cancellationToken)
     {
+        if (_workingQueue is null)
+        {
+            return;
+        }
+
         await foreach (ICounterPayload data in _workingQueue.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
             await WriteDataAsync(data, default).ConfigureAwait(false);
@@ -187,7 +194,7 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
         {
             try
             {
-                AppendBlobClient blobClient = _blobContainerClient.GetAppendBlobClient(cacheKey);
+                AppendBlobClient blobClient = _blobContainerClient.Value.GetAppendBlobClient(cacheKey);
                 block.Seek(0, SeekOrigin.Begin);
                 _logger.LogDebug("Appending {size} bytes of data to blob: {blobName}", block.Length, cacheKey);
                 await blobClient.CreateIfNotExistsAsync().ConfigureAwait(false);
@@ -244,6 +251,12 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
 
     public bool Submit(ICounterPayload data)
     {
+        if (_workingQueue is null)
+        {
+            _logger.LogTrace("Sink {name} is not enabled.", nameof(AzureBlobSink));
+            return false;
+        }
+
         bool success = _workingQueue.Writer.TryWrite(data);
         if (_logger.IsEnabled(LogLevel.Trace))
         {
@@ -260,24 +273,28 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
         }
         _isDisposed = true;
 
-        _logger.LogInformation("Flush the buffer and send data to storage...");
-        bool writerCompleted = _workingQueue.Writer.TryComplete();
-        if (writerCompleted)
+        if (_workingQueue is not null)
         {
-            _logger.LogDebug("Writer completed");
-        }
-        else
-        {
-            _logger.LogDebug("Writer failed completing. Maybe already completed before?");
-        }
+            _logger.LogInformation("Flush the buffer and send data to storage...");
+            bool writerCompleted = _workingQueue.Writer.TryComplete();
+            if (writerCompleted)
+            {
+                _logger.LogDebug("Writer completed");
+            }
+            else
+            {
+                _logger.LogDebug("Writer failed completing. Maybe already completed before?");
+            }
 
-        _logger.LogDebug("Channel writer got completed: {result}", writerCompleted);
-        // The last batch
-        _logger.LogDebug("Writer completed.");
-        await _workingQueue.Reader.Completion.ConfigureAwait(false);
-        _logger.LogDebug("Channel reader completed.");
+            _logger.LogDebug("Channel writer got completed: {result}", writerCompleted);
+            // The last batch
+            _logger.LogDebug("Writer completed.");
 
-        await FlushAsync(default).ConfigureAwait(false);
+            await _workingQueue.Reader.Completion.ConfigureAwait(false);
+            _logger.LogDebug("Channel reader completed.");
+
+            await FlushAsync(default).ConfigureAwait(false);
+        }
 
         _semaphoreSlim?.Dispose();
         _semaphoreSlim = null;
