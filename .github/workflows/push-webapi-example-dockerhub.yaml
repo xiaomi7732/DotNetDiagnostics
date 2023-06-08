@@ -1,4 +1,4 @@
-name: CI-opendd-linux-demo-app-service
+name: Build & Push opendd webapi example container image
 
 env:
     IMAGE_NAME: opendd-webapi-example
@@ -6,8 +6,10 @@ env:
     TARGET_PROJECT: "examples/WebAPIExample/WebAPIExample.csproj"
 
 on:
-    release:
-        types: [published]
+    workflow_dispatch:
+        inputs:
+            image_version:
+                required: true
 
 permissions:
     contents: read
@@ -54,5 +56,5 @@ jobs:
                 context: ./examples/WebAPIExample
                 file: ./examples/WebAPIExample/dockerfile
                 push: true
-                tags: ${{ steps.meta.outputs.tags }}
+                tags: ${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.image_version }},${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest
                 labels: ${{ steps.meta.outputs.labels }}
