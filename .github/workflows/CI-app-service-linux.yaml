@@ -52,7 +52,7 @@ jobs:
               uses: docker/build-push-action@v4.0.0
               with:
                 context: ./examples/WebAPIExample
-                file: ./examples/dockerfile
+                file: ./examples/WebAPIExample/dockerfile
                 push: true
                 tags: ${{ steps.meta.outputs.tags }}
                 labels: ${{ steps.meta.outputs.labels }}
