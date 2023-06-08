@@ -1,74 +1,58 @@
 name: CI-opendd-linux-demo-app-service
 
 env:
-  AZURE_WEBAPP_NAME: opendd-linux-demo    # set this to the name of your Azure Web App
-  AZURE_WEBAPP_PACKAGE_PATH: '.'      # set this to the path to your web app project, defaults to the repository root
-  DOTNET_VERSION: '7.x'                 # set this to the .NET Core version to use
-  TARGET_PROJECT: 'examples/WebAPIExample/WebAPIExample.csproj'
+    IMAGE_NAME: opendd-webapi-example
+    DOTNET_VERSION: "7.x" # set this to the .NET Core version to use
+    TARGET_PROJECT: "examples/WebAPIExample/WebAPIExample.csproj"
 
 on:
-  push:
-    paths-ignore:
-      - "Readme.md"
-      - "images/**"
-    branches: [ "main" ]
-  workflow_dispatch:
+    release:
+        types: [published]
 
 permissions:
-  contents: read
+    contents: read
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+    push_to_registry:
+        name: Push WebAPIExample to Docker Hub
+        runs-on: ubuntu-latest
+        steps:
+            - name: Check out the repo
+              uses: actions/checkout@v3
 
-    steps:
-      - uses: actions/checkout@v3
+            - name: Set up .NET SDK
+              uses: actions/setup-dotnet@v2
+              with:
+                  dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Set up .NET SDK
-        uses: actions/setup-dotnet@v2
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
+            - name: Set up dependency caching for faster builds
+              uses: actions/cache@v3
+              with:
+                  path: ~/.nuget/packages
+                  key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
+                  restore-keys: |
+                      ${{ runner.os }}-nuget-
 
-      - name: Set up dependency caching for faster builds
-        uses: actions/cache@v3
-        with:
-          path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-nuget-
+            - name: Publish with dotnet
+              run: dotnet publish ${{ env.TARGET_PROJECT }} --configuration Release
 
-      - name: Build with dotnet
-        run: dotnet build ${{ env.TARGET_PROJECT }} --configuration Release
+            - name: Log in to Docker Hub
+              uses: docker/login-action@v2
+              with:
+                username: ${{ secrets.DOCKER_USERNAME }}
+                password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: dotnet publish
-        run: dotnet publish ${{ env.TARGET_PROJECT }} -c Release -o ${{env.DOTNET_ROOT}}/myapp
-
-      - name: Upload artifact for deployment job
-        uses: actions/upload-artifact@v3
-        with:
-          name: .net-app
-          path: ${{env.DOTNET_ROOT}}/myapp
-          retention-days: 1
-
-  deploy:
-    permissions:
-      contents: none
-    runs-on: ubuntu-latest
-    needs: build
-    environment:
-      name: 'Development'
-      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
-
-    steps:
-      - name: Download artifact from build job
-        uses: actions/download-artifact@v3
-        with:
-          name: .net-app
-
-      - name: Deploy to Azure Web App
-        id: deploy-to-webapp
-        uses: azure/webapps-deploy@v2
-        with:
-          app-name: ${{ env.AZURE_WEBAPP_NAME }}
-          publish-profile: ${{ secrets.OPENDD_LINUX_DEMO_AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
+            - name: Extract metadata (tags, labels) for Docker
+              id: meta
+              uses: docker/metadata-action@v4.5.0
+              with:
+                images: ${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}
+            
+            - name: Build and push Docker image
+              uses: docker/build-push-action@v4.0.0
+              with:
+                context: ./examples/WebAPIExample
+                file: ./examples/dockerfile
+                push: true
+                tags: ${{ steps.meta.outputs.tags }}
+                labels: ${{ steps.meta.outputs.labels }}
