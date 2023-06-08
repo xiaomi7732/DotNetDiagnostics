@@ -7,7 +7,7 @@ builder.Services.AddLogging(loggingBuilder => loggingBuilder.AddSimpleConsole(op
 
 builder.Services.AddDotNetCounters()
     .WithProcessStartTrigger()
-    .WithAzureBlobJobDispatcher()
+    // .WithAzureBlobJobDispatcher()
     .WithLocalFileSink()
     .WithAzureBlobSink()
     .WithApplicationInsightsSink()
