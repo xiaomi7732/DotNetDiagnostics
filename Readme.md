@@ -73,10 +73,11 @@ Assuming you have an ASP.NET Core WebAPI project:
 
     What we see: it is a pretty small amount of `working set` used over the period, yet we could still see dips, probably GC?
 
-## Scenarios
+## Scenarios / Cases
 
 * [Basic settings of the pipeline and the customizations](./examples/WebAPIExample/)
 * [Enable `dotnet-counters` for CPU usage monitoring](./examples/CPUIntensiveApp/)
+* [Use `dotnet-counters` for ThreadPool starvation detection](./examples/ThreadPoolStarvationExample/)
 
 For more, read the [wiki](https://github.com/xiaomi7732/DotNetDiagnostics/wiki).
 
