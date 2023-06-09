@@ -7,10 +7,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="OpenDotNetDiagnostics.Counters.Sinks.AzureBlob" Version="1.0.0-beta4" />
-    <PackageReference Include="OpenDotNetDiagnostics.Counters.Sinks.LocalFile" Version="1.0.0-beta4" />
-    <PackageReference Include="OpenDotNetDiagnostics.Counters.Triggers.ProcessStart" Version="1.0.0-beta4" />
-    <PackageReference Include="OpenDotNetDiagnostics.Counters.WebEndpoints" Version="1.0.0-beta4" />
+    <PackageReference Include="OpenDotNetDiagnostics.Counters.Sinks.AzureBlob" Version="1.0.0-beta5" />
+    <PackageReference Include="OpenDotNetDiagnostics.Counters.Sinks.LocalFile" Version="1.0.0-beta5" />
+    <PackageReference Include="OpenDotNetDiagnostics.Counters.Triggers.ProcessStart" Version="1.0.0-beta5" />
+    <PackageReference Include="OpenDotNetDiagnostics.Counters.WebEndpoints" Version="1.0.0-beta5" />
   </ItemGroup>
 
 </Project>
