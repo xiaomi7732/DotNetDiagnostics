@@ -10,7 +10,7 @@ namespace Microsoft.AspNetCore.Builder;
 
 public static class AzureBlobJobServiceCollectionExtensions
 {
-    public static DotNetCountersPipelineBuilder WithAzureBlobJobDispatcher(
+    public static DotNetCountersPipelineBuilder AddAzureBlobJobDispatcher(
         this DotNetCountersPipelineBuilder builder,
         string jobsSectionName = IJobOptions.DefaultSectionName,
         string sectionName = AzureBlobJobOptions.DefaultSectionName)

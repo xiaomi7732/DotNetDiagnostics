@@ -29,7 +29,7 @@ public class AzureBlobJobDispatcher : IJobDispatcher<DotNetCountersJobDetail>
         {
             throw new ArgumentNullException(nameof(blobClientBuilder));
         }
-        BlobServiceClient blobServiceClient = blobClientBuilder.WithAzureBlobOptions(_options).Build();
+        BlobServiceClient blobServiceClient = blobClientBuilder.AddAzureBlobOptions(_options).Build();
         _blobContainerClient = blobServiceClient.GetBlobContainerClient(_options.ContainerName);
     }
 

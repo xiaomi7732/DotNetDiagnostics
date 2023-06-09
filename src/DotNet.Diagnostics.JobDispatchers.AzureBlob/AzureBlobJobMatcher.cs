@@ -44,7 +44,7 @@ public class AzureBlobJobMatcher : IJobMatcher<DotNetCountersJobDetail>
         _jobNameProvider = jobNameProvider ?? throw new ArgumentNullException(nameof(jobNameProvider));
         _jsonSerializerOptionsProvider = jsonSerializerOptionsProvider ?? throw new ArgumentNullException(nameof(jsonSerializerOptionsProvider));
         _dotnetCountersClient = dotnetCountersClient ?? throw new ArgumentNullException(nameof(dotnetCountersClient));
-        BlobServiceClient blobServiceClient = blobClientBuilder.WithAzureBlobOptions(_options).Build();
+        BlobServiceClient blobServiceClient = blobClientBuilder.AddAzureBlobOptions(_options).Build();
         _blobContainerClient = blobServiceClient.GetBlobContainerClient(_options.ContainerName);
     }
 

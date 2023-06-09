@@ -9,7 +9,7 @@ namespace Microsoft.AspNetCore.Builder;
 
 public static class ProcessStartTriggerServiceCollectionExtensions
 {
-    public static DotNetCountersPipelineBuilder WithProcessStartTrigger(
+    public static DotNetCountersPipelineBuilder AddProcessStartTrigger(
         this DotNetCountersPipelineBuilder builder,
         string triggersSectionName = TriggerOptions.DefaultSectionName,
         string sectionName = ProcessStartTriggerOptions.DefaultSectionName)

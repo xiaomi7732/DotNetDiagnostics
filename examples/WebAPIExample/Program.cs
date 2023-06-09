@@ -8,11 +8,11 @@ builder.Services.AddLogging(loggingBuilder => loggingBuilder.AddSimpleConsole(op
 builder.Services.AddDotNetCounters(pipeline =>
 {
     pipeline
-        .WithProcessStartTrigger()
-        .WithAzureBlobJobDispatcher()
-        .WithLocalFileSink()
-        .WithAzureBlobSink()
-        .WithApplicationInsightsSink();
+        .AddProcessStartTrigger()
+        .AddAzureBlobJobDispatcher()
+        .AddLocalFileSink()
+        .AddAzureBlobSink()
+        .AddApplicationInsightsSink();
 });
 
 // Register services for Application Insights, this is required for the app insights sink to work.
