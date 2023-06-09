@@ -7,11 +7,21 @@ builder.Services.AddLogging(loggingBuilder => loggingBuilder.AddSimpleConsole(op
 
 builder.Services.AddDotNetCounters(pipeline =>
 {
+    // Configure the pipeline to adding triggers, a job dispatcher and various sinks.
     pipeline
         .AddProcessStartTrigger()
-        .AddAzureBlobJobDispatcher()
+        /* Enables job dispatcher that uses an Azure Storage to coordinate.
+        Refer to https://github.com/xiaomi7732/DotNetDiagnostics/wiki/How-to-run-dotnet-counters-in-multiple-instances
+        for more details. */
+        // .AddAzureBlobJobDispatcher()
+
+        // Local file sink
         .AddLocalFileSink()
-        .AddAzureBlobSink()
+
+        /* Enables the sink to output data to an azure blob storage. */
+        // .AddAzureBlobSink()
+
+        // Application insights sink
         .AddApplicationInsightsSink();
 });
 
