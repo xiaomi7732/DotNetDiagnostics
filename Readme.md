@@ -22,9 +22,9 @@ Assuming you have an ASP.NET Core WebAPI project:
     var builder = WebApplication.CreateBuilder(args);
 
     // Register `dotnet-counters` service and its sink.
-    builder.Services.AddDotNetCounters()
-        .WithLocalFileSink()
-        .Register();
+    builder.Services.AddDotNetCounters(pipeline => {
+        pipeline.AddLocalFileSink()
+    });
 
     var app = builder.Build();
 

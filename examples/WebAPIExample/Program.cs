@@ -5,13 +5,25 @@ builder.Services.AddLogging(loggingBuilder => loggingBuilder.AddSimpleConsole(op
     opt.SingleLine = true;
 }));
 
-builder.Services.AddDotNetCounters()
-    .WithProcessStartTrigger()
-    // .WithAzureBlobJobDispatcher()
-    .WithLocalFileSink()
-    .WithAzureBlobSink()
-    .WithApplicationInsightsSink()
-    .Register();
+builder.Services.AddDotNetCounters(pipeline =>
+{
+    // Configure the pipeline to adding triggers, a job dispatcher and various sinks.
+    pipeline
+        .AddProcessStartTrigger()
+        /* Enables job dispatcher that uses an Azure Storage to coordinate.
+        Refer to https://github.com/xiaomi7732/DotNetDiagnostics/wiki/How-to-run-dotnet-counters-in-multiple-instances
+        for more details. */
+        // .AddAzureBlobJobDispatcher()
+
+        // Local file sink
+        .AddLocalFileSink()
+
+        /* Enables the sink to output data to an azure blob storage. */
+        // .AddAzureBlobSink()
+
+        // Application insights sink
+        .AddApplicationInsightsSink();
+});
 
 // Register services for Application Insights, this is required for the app insights sink to work.
 builder.Services.AddApplicationInsightsTelemetry();

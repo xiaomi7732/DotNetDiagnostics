@@ -48,7 +48,7 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
 
         _blobContainerClient = new Lazy<BlobContainerClient>(() =>
         {
-            BlobServiceClient blobServiceClient = _blobClientBuilder.WithAzureBlobOptions(_options).Build();
+            BlobServiceClient blobServiceClient = _blobClientBuilder.AddAzureBlobOptions(_options).Build();
             return blobServiceClient.GetBlobContainerClient(_options.ContainerName);
         }, LazyThreadSafetyMode.ExecutionAndPublication);
     }

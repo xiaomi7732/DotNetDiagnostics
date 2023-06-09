@@ -9,7 +9,7 @@ namespace Microsoft.AspNetCore.Builder;
 
 public static class LocalFileSinkServiceCollectionExtensions
 {
-    public static DotNetCountersPipelineBuilder WithLocalFileSink(
+    public static DotNetCountersPipelineBuilder AddLocalFileSink(
         this DotNetCountersPipelineBuilder builder,
         string sinksSectionName = SinkOptions.DefaultSectionName,
         string sectionName = LocalFileSinkOptions.DefaultSectionName)

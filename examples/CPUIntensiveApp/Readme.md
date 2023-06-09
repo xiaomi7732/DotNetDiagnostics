@@ -36,8 +36,7 @@ To get the result by yourself, start by cloning this repo and navigate to `/exam
     And register the service, in [Program.cs](./Program.cs):
 
     ```csharp
-    builder.Services.AddDotNetCounters()
-        .Register();
+    builder.Services.AddDotNetCounters();
     ```
 
 1. We will then need to expose an endpoint to enable/disable `dotnet-counters`. For example, we want to expose it at `/dotnet-counters`:
@@ -55,9 +54,9 @@ To get the result by yourself, start by cloning this repo and navigate to `/exam
     And then register the service:
 
     ```csharp
-    builder.Services.AddDotNetCounters()
-        .WithLocalFileSink()    // Output to a local file to the default path.
-        .Register();
+    builder.Services.AddDotNetCounters(pipeline =>{
+        pipeline.AddLocalFileSink();    // Output to a local file to the default path.
+    })
     ```
 
 ## Run the application
@@ -158,8 +157,8 @@ Following these steps to output the result file to Azure Storage.
 
     ```csharp
     builder.Services.AddDotNetCounters()
-        .WithLocalFileSink()
-        .WithAzureBlobSink()
+        .AddLocalFileSink()
+        .AddAzureBlobSink()
         .Register(); 
     ```
 
@@ -203,11 +202,10 @@ To start `dotnet-counters` at the beginning of your application, we will leverag
 1. Register the service in [Program.cs](./Program.cs):
 
     ```csharp
-    builder.Services
-        .AddDotNetCounters()
-        .WithLocalFileSink()
-        .WithProcessStartTrigger()  // Enables dotnet-counters upon process start.
-        .Register();
+    builder.Services.AddDotNetCounters(pipeline => {
+        pipeline.AddLocalFileSink()
+            .AddProcessStartTrigger()  // Enables dotnet-counters upon process start.
+    });
     ```
 
 And the counters will be enabled at the beginning of the application.

@@ -8,7 +8,7 @@ namespace Microsoft.AspNetCore.Builder;
 
 public static class ApplicationInsightsSinkServiceCollectionExtensions
 {
-    public static DotNetCountersPipelineBuilder WithApplicationInsightsSink(this DotNetCountersPipelineBuilder builder)
+    public static DotNetCountersPipelineBuilder AddApplicationInsightsSink(this DotNetCountersPipelineBuilder builder)
     {
         builder.AppendAction(services =>
         {

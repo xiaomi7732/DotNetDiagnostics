@@ -5,10 +5,10 @@ builder.Services.AddDotNetCounters()
     /*Uncomment this line if you choose to output the result to the Azure Storage Blob.
         You will also need to setup the configurations for accessing the storage. Refer to 
         this wiki: https://github.com/xiaomi7732/DotNetDiagnostics/wiki/Using-Azure-Blob-for-Data-File-Output*/
-    // .WithAzureBlobSink() 
+    // .AddAzureBlobSink() 
 
     /*Uncomment this line if you want to enable dotnet-counters when the application starts.*/
-    // .WithProcessStartTrigger()
+    // .AddProcessStartTrigger()
     .Register();
 
 var app = builder.Build();

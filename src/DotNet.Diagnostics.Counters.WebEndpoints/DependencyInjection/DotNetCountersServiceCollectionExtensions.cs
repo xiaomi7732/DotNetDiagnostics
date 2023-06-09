@@ -9,7 +9,7 @@ namespace Microsoft.Extensions.DependencyInjection;
 
 public static class DotNetCountersServiceCollectionExtensions
 {
-    public static DotNetCountersPipelineBuilder AddDotNetCounters(this IServiceCollection services, string sectionName = "DotNetCounters")
+    public static IServiceCollection AddDotNetCounters(this IServiceCollection services, Action<DotNetCountersPipelineBuilder>? pipelineBuilder = null, string sectionName = "DotNetCounters")
     {
         Action<IServiceCollection> actions = (services =>
         {
@@ -32,6 +32,13 @@ public static class DotNetCountersServiceCollectionExtensions
             services.TryAddSingleton<ISink<IDotNetCountersClient, ICounterPayload>>(p => (ISink<IDotNetCountersClient, ICounterPayload>)p.GetRequiredService<ICounterPayloadSet>());
         });
 
-        return new DotNetCountersPipelineBuilder(actions, services, sectionName);
+        DotNetCountersPipelineBuilder builder = new DotNetCountersPipelineBuilder(actions, services, sectionName);
+
+        // Allows further extension of the builder.
+        pipelineBuilder?.Invoke(builder);
+
+        builder.Register();
+
+        return services;
     }
 }

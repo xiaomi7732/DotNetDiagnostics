@@ -9,7 +9,7 @@ namespace Microsoft.AspNetCore.Builder;
 
 public static class AzureBlobSinkServiceCollectionExtensions
 {
-    public static DotNetCountersPipelineBuilder WithAzureBlobSink(
+    public static DotNetCountersPipelineBuilder AddAzureBlobSink(
         this DotNetCountersPipelineBuilder builder,
         string sinksSectionName = SinkOptions.DefaultSectionName,
         string sectionName = AzureBlobSinkOptions.DefaultSectionName)

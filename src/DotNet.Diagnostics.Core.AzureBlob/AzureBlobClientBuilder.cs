@@ -19,7 +19,7 @@ public class AzureBlobClientBuilder
         return BuildByTokenCredential();
     }
 
-    public AzureBlobClientBuilder WithAzureBlobOptions(AzureBlobOptions options)
+    public AzureBlobClientBuilder AddAzureBlobOptions(AzureBlobOptions options)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         return this;
@@ -45,7 +45,7 @@ public class AzureBlobClientBuilder
     {
         if (_options is null)
         {
-            throw new InvalidOperationException("Can't build Azure Blob Client by token credential. Did you call `WithAzureBlobOptions` first?");
+            throw new InvalidOperationException("Can't build Azure Blob Client by token credential. Did you call `AddAzureBlobOptions` first?");
         }
 
         if (string.IsNullOrEmpty(_options.ConnectionString) && _options.ServiceUri is null)

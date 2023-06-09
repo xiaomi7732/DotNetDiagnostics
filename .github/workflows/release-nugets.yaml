@@ -2,6 +2,9 @@ name: Release NuGets
 
 on:
   workflow_dispatch:
+    inputs:
+      package_version:
+        required: true
 
 env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
@@ -34,7 +37,7 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       # Build NuGet packages
-      - run: dotnet pack ${{ matrix.project }} --configuration Release --output ${{ env.NuGetDirectory }}
+      - run: dotnet pack ${{ matrix.project }} -p:PackageVersion=${{ inputs.package_version }} --configuration Release --output ${{ env.NuGetDirectory }}
 
       # Publish the NuGet packages as an artifact
       - uses: actions/upload-artifact@v3
