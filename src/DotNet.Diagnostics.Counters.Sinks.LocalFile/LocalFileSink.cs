@@ -62,11 +62,11 @@ public sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPayload
     {
         await foreach (ICounterPayload data in _workingQueue.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
-            await WriteDataAsync(data).ConfigureAwait(false);
+            await WriteDataAsync(data, cancellationToken).ConfigureAwait(false);
         }
     }
 
-    private async Task WriteDataAsync(ICounterPayload payload)
+    private async Task WriteDataAsync(ICounterPayload payload, CancellationToken cancellationToken)
     {
         string fullFileName = GetFullFileName(payload.Timestamp);
         Directory.CreateDirectory(Path.GetDirectoryName(fullFileName)!);
@@ -80,8 +80,13 @@ public sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPayload
 
         if (_currentStream is null)
         {
-            _logger.LogInformation("Open writing: {fileName}", fullFileName);
-            _currentStream = File.Open(fullFileName, fileStreamOptions);
+            _logger.LogDebug("Output file is not opened yet. Open writing: {fileName}", fullFileName);
+            _currentStream = await TryOpenFileStreamAsync(fullFileName, fileStreamOptions, cancellationToken).ConfigureAwait(false);
+            if (_currentStream is null)
+            {
+                return;
+            }
+            _logger.LogInformation("File opened successfully for writing: {fileName}", fullFileName);
             await WriteHeaderAsync(_currentStream, default).ConfigureAwait(false);
         }
 
@@ -104,6 +109,26 @@ public sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPayload
         }
 
         await WriteDataAsync(_currentStream, payload, default).ConfigureAwait(false);
+    }
+
+    private async Task<FileStream?> TryOpenFileStreamAsync(string fullPath, FileStreamOptions options, CancellationToken cancellationToken)
+    {
+        if(cancellationToken.IsCancellationRequested)
+        {
+            return null;
+        }
+
+        try
+        {
+            FileStream fileStream = File.Open(fullPath, options);
+            return fileStream;
+        }
+        catch (IOException ex)
+        {
+            _logger.LogError(ex, "Error opening target file: {fullPath}", fullPath);
+        }
+        await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
+        return null;
     }
 
     private string GetFullFileName(DateTime timestamp)
