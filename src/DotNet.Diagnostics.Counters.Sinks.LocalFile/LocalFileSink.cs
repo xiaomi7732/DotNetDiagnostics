@@ -10,11 +10,7 @@ public sealed class LocalFileSink : SinkBase<IDotNetCountersClient, ICounterPayl
     private bool _isDisposed = false;
     private readonly LocalFileSinkOptions _options;
     private static FileStream? _currentStream = null;
-    private readonly Channel<ICounterPayload> _workingQueue = Channel.CreateUnbounded<ICounterPayload>(new UnboundedChannelOptions()
-    {
-        SingleReader = true,
-        SingleWriter = false,
-    });
+    private Channel<ICounterPayload>? _workingQueue;
 
     private readonly IPayloadWriter _payloadWriter;
     private readonly LoggingFileNameProvider _fileNameProvider;
@@ -150,10 +146,14 @@ public sealed class LocalFileSink : SinkBase<IDotNetCountersClient, ICounterPayl
 
         _logger.LogInformation("Flush the buffer and send data to storage...");
 
-        _workingQueue.Writer.TryComplete();
-        _logger.LogDebug("Writer completed.");
-        await _workingQueue.Reader.Completion.ConfigureAwait(false);
-        _logger.LogDebug("Reader completed.");
+        if (_workingQueue is not null)
+        {
+            _workingQueue.Writer.TryComplete();
+            _logger.LogDebug("Writer completed.");
+
+            await _workingQueue.Reader.Completion.ConfigureAwait(false);
+            _logger.LogDebug("Reader completed.");
+        }
 
         if (_currentStream is not null)
         {
@@ -167,6 +167,7 @@ public sealed class LocalFileSink : SinkBase<IDotNetCountersClient, ICounterPayl
 
     protected override async Task<bool> OnStartingAsync(CancellationToken cancellationToken)
     {
+        _workingQueue = CreateChannel();
         await StartWatchingQueueAsync(cancellationToken).ConfigureAwait(false);
         return true;
     }
@@ -175,8 +176,11 @@ public sealed class LocalFileSink : SinkBase<IDotNetCountersClient, ICounterPayl
     {
         _logger.LogInformation("Stopping Sink");
 
-        _workingQueue.Writer.Complete();
-        await _workingQueue.Reader.Completion.ConfigureAwait(false);
+        if (_workingQueue is not null)
+        {
+            _workingQueue.Writer.Complete();
+            await _workingQueue.Reader.Completion.ConfigureAwait(false);
+        }
 
         if (_currentStream is not null)
         {
@@ -190,6 +194,12 @@ public sealed class LocalFileSink : SinkBase<IDotNetCountersClient, ICounterPayl
 
     protected override bool OnSubmit(ICounterPayload data)
     {
+        if (_workingQueue is null)
+        {
+            _logger.LogError("Working queue has to be created before the sink's enabled.");
+            return false;
+        }
+
         bool success = _workingQueue.Writer.TryWrite(data);
         if (_logger.IsEnabled(LogLevel.Trace))
         {
@@ -197,4 +207,11 @@ public sealed class LocalFileSink : SinkBase<IDotNetCountersClient, ICounterPayl
         }
         return success;
     }
+
+    private Channel<ICounterPayload> CreateChannel() =>
+        Channel.CreateUnbounded<ICounterPayload>(new UnboundedChannelOptions()
+        {
+            SingleReader = true,
+            SingleWriter = false,
+        });
 }
