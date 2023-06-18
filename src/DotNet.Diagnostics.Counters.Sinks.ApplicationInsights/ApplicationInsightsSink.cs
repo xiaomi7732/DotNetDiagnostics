@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 
 namespace DotNet.Diagnostics.Counters.Sinks.ApplicationInsights;
 
-public class ApplicationInsightsSink : ISink<IDotNetCountersClient, ICounterPayload>
+public class ApplicationInsightsSink : SinkBase<IDotNetCountersClient, ICounterPayload>
 {
     private TelemetryClient? _telemetryClient;
     private TelemetryConfiguration? _telemetryConfiguration;
@@ -30,48 +30,50 @@ public class ApplicationInsightsSink : ISink<IDotNetCountersClient, ICounterPayl
         }
     }
 
-    public async Task FlushAsync(CancellationToken cancellationToken)
-    {
-        await Task.Yield();
-        if (_telemetryConfiguration is null)
-        {
-            return;
-        }
 
-        if (_telemetryClient is not null)
-        {
-            await _telemetryClient.FlushAsync(cancellationToken).ConfigureAwait(false);
-        }
-        _telemetryConfiguration.TelemetryChannel?.Flush();
-    }
-
-    public async Task StartAsync(CancellationToken cancellationToken)
+    protected override async Task<bool> OnStartingAsync(CancellationToken cancellationToken)
     {
         await Task.Yield();
 
         if (_telemetryConfiguration is null || _telemetryClient is null)
         {
             _logger.LogInformation("Application Insights is not configured.");
-            return;
+            return false;
         }
 
         string instrumentationKey = _telemetryConfiguration.InstrumentationKey;
-        if(string.IsNullOrEmpty(instrumentationKey))
+        if (string.IsNullOrEmpty(instrumentationKey))
         {
             _logger.LogWarning("Instrumentation key is required. Have you configured the application insights instrumentation key or connection string correctly?");
             _telemetryConfiguration = null;
             _telemetryClient = null;
-            
-            return;
+
+            return false;
         }
 
         _logger.LogInformation("Start sending data to application insights by instrumentation key: {iKey}", _telemetryConfiguration.InstrumentationKey);
+        return true;
     }
 
-    public bool Submit(ICounterPayload data)
+    protected override async Task<bool> OnStoppingAsync(CancellationToken cancellationToken)
+    {
+        await Task.Yield();
+        if (_telemetryConfiguration is null || _telemetryClient is null)
+        {
+            // without telemetry configuration, or telemetry client, there's nothing to enable or disable.
+            return false;
+        }
+
+        await _telemetryClient.FlushAsync(cancellationToken).ConfigureAwait(false);
+        _telemetryConfiguration.TelemetryChannel?.Flush();
+        return true;
+    }
+
+    protected override bool OnSubmit(ICounterPayload data)
     {
         if (_telemetryClient is null)
         {
+            _logger.LogError("Telemetry client is expected to exist before the sink could be turned on.");
             return false;
         }
 

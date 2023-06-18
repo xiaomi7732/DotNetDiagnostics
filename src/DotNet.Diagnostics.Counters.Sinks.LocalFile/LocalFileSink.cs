@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 
 namespace DotNet.Diagnostics.Counters.Sinks.LocalFile;
 
-public sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPayload>, IAsyncDisposable
+public sealed class LocalFileSink : SinkBase<IDotNetCountersClient, ICounterPayload>, IAsyncDisposable
 {
     private bool _isDisposed = false;
     private readonly LocalFileSinkOptions _options;
@@ -15,6 +15,7 @@ public sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPayload
         SingleReader = true,
         SingleWriter = false,
     });
+
     private readonly IPayloadWriter _payloadWriter;
     private readonly LoggingFileNameProvider _fileNameProvider;
     private readonly ILogger _logger;
@@ -30,18 +31,6 @@ public sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPayload
         _payloadWriter = payloadWriter ?? throw new ArgumentNullException(nameof(payloadWriter));
         _fileNameProvider = fileNameProvider ?? throw new ArgumentNullException(nameof(fileNameProvider));
     }
-
-    public bool Submit(ICounterPayload data)
-    {
-        bool success = _workingQueue.Writer.TryWrite(data);
-        if (_logger.IsEnabled(LogLevel.Trace))
-        {
-            _logger.LogTrace("Payload submitted. Result: {success}", success);
-        }
-        return success;
-    }
-
-    public Task StartAsync(CancellationToken cancellationToken) => StartWatchingQueueAsync(cancellationToken);
 
     private async Task StartWatchingQueueAsync(CancellationToken cancellationToken)
     {
@@ -113,7 +102,7 @@ public sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPayload
 
     private async Task<FileStream?> TryOpenFileStreamAsync(string fullPath, FileStreamOptions options, CancellationToken cancellationToken)
     {
-        if(cancellationToken.IsCancellationRequested)
+        if (cancellationToken.IsCancellationRequested)
         {
             return null;
         }
@@ -150,7 +139,6 @@ public sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPayload
         };
     }
 
-
     public async ValueTask DisposeAsync()
     {
         if (_isDisposed)
@@ -159,11 +147,12 @@ public sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPayload
         }
         _isDisposed = true;
 
+
         _logger.LogInformation("Flush the buffer and send data to storage...");
 
         _workingQueue.Writer.TryComplete();
         _logger.LogDebug("Writer completed.");
-        await _workingQueue.Reader.Completion;
+        await _workingQueue.Reader.Completion.ConfigureAwait(false);
         _logger.LogDebug("Reader completed.");
 
         if (_currentStream is not null)
@@ -172,8 +161,40 @@ public sealed class LocalFileSink : ISink<IDotNetCountersClient, ICounterPayload
             _currentStream.Dispose();
         }
         _currentStream = null;
+
+        Dispose(true);
     }
 
-    public Task FlushAsync(CancellationToken cancellationToken) =>
-        _currentStream is null ? Task.CompletedTask : _currentStream.FlushAsync(cancellationToken);
+    protected override async Task<bool> OnStartingAsync(CancellationToken cancellationToken)
+    {
+        await StartWatchingQueueAsync(cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
+    protected override async Task<bool> OnStoppingAsync(CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Stopping Sink");
+
+        _workingQueue.Writer.Complete();
+        await _workingQueue.Reader.Completion.ConfigureAwait(false);
+
+        if (_currentStream is not null)
+        {
+            await _currentStream.DisposeAsync().ConfigureAwait(false);
+            _currentStream.Dispose();
+            _currentStream = null;
+        }
+
+        return true;
+    }
+
+    protected override bool OnSubmit(ICounterPayload data)
+    {
+        bool success = _workingQueue.Writer.TryWrite(data);
+        if (_logger.IsEnabled(LogLevel.Trace))
+        {
+            _logger.LogTrace("Payload submitted. Result: {success}", success);
+        }
+        return success;
+    }
 }
