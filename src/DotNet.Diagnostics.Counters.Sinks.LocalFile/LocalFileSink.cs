@@ -36,9 +36,12 @@ public sealed class LocalFileSink : SinkBase<IDotNetCountersClient, ICounterPayl
         }
         catch (OperationCanceledException ex) when (ex.CancellationToken == cancellationToken)
         {
-            _workingQueue.Writer.TryComplete();
-            // Clean up the queue.
-            await PumpTheChannelAsync(default).ConfigureAwait(false); // No cancellation token this time.
+            if (_workingQueue is not null)
+            {
+                _workingQueue.Writer.TryComplete();
+                // Clean up the queue.
+                await PumpTheChannelAsync(default).ConfigureAwait(false); // No cancellation token this time.
+            }
             throw;
         }
     }
@@ -165,11 +168,14 @@ public sealed class LocalFileSink : SinkBase<IDotNetCountersClient, ICounterPayl
         Dispose(true);
     }
 
-    protected override async Task<bool> OnStartingAsync(CancellationToken cancellationToken)
+    protected override Task<bool> OnStartingAsync(CancellationToken cancellationToken)
     {
         _workingQueue = CreateChannel();
-        await StartWatchingQueueAsync(cancellationToken).ConfigureAwait(false);
-        return true;
+        Task.Run(async () =>
+        {
+            await StartWatchingQueueAsync(cancellationToken).ConfigureAwait(false);
+        });
+        return Task.FromResult(true);
     }
 
     protected override async Task<bool> OnStoppingAsync(CancellationToken cancellationToken)
