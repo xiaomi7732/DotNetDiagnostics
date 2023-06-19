@@ -21,7 +21,7 @@ public class SinkBackgroundService<T> : BackgroundService
         {
             _logger.LogInformation("Start sink background service");
             await Task.Yield();
-            await _sink.StartAsync(stoppingToken);
+            await _sink.InitializeAsync(stoppingToken).ConfigureAwait(false);
         }
         catch (InvalidOperationException ex)
         {

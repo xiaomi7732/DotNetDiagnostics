@@ -70,18 +70,8 @@ public sealed class DotNetCountersClient : IDotNetCountersClient, IAsyncDisposab
 
             if (_eventPipeSession is not null)
             {
-                await _eventPipeSession.StopAsync(cancellationToken);
-                foreach (var sink in _outputSinks)
-                {
-                    try
-                    {
-                        await sink.StopAsync(cancellationToken);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogDebug(ex, "Error flushing sink of {sinkType}", sink.GetType());
-                    }
-                }
+                await _eventPipeSession.StopAsync(cancellationToken).ConfigureAwait(false);
+                await TryStopAllSinksAsync(cancellationToken).ConfigureAwait(false);
                 _logger.LogInformation("dotnet-counters disabled...");
 
             }
@@ -137,12 +127,12 @@ public sealed class DotNetCountersClient : IDotNetCountersClient, IAsyncDisposab
                 return false;
             }
 
+            await TryEnableAllSinksAsync(cancellationToken).ConfigureAwait(false);
             _ = Task.Run(() =>
             {
                 try
                 {
                     DiagnosticsClient diagnosticsClient = new DiagnosticsClient(processId);
-
                     _outputStream = new MemoryStream();
                     _eventPipeSession = diagnosticsClient.StartEventPipeSession(GetEventPipeProviders(), requestRundown: false, circularBufferMB: 10);
                     diagnosticsClient.ResumeRuntime();
@@ -175,6 +165,45 @@ public sealed class DotNetCountersClient : IDotNetCountersClient, IAsyncDisposab
             _lock.Release();
         }
     }
+
+    /// <summary>
+    /// Enables all the sinks.
+    /// </summary>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    private async Task TryEnableAllSinksAsync(CancellationToken cancellationToken)
+    {
+        foreach (ISink<IDotNetCountersClient, ICounterPayload> sink in _outputSinks)
+        {
+            try
+            {
+                await sink.StartAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error starting the sink of {sinkType}", sink.GetType());
+            }
+        }
+    }
+
+    /// <summary>
+    /// Stops all the sinks.
+    /// </summary>
+    private async Task TryStopAllSinksAsync(CancellationToken cancellationToken)
+    {
+        foreach (var sink in _outputSinks)
+        {
+            try
+            {
+                await sink.StopAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Error flushing sink of {sinkType}", sink.GetType());
+            }
+        }
+    }
+
 
     private void DynamicAllMonitor(TraceEvent traceEventObject)
     {

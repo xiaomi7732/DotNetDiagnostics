@@ -6,6 +6,13 @@ public abstract class SinkBase<TSource, TData> : ISink<TSource, TData>, IDisposa
     private bool _isEnabled;
     private bool _isDisposed;
 
+    /// <inheritdoc />
+    public virtual Task InitializeAsync(CancellationToken cancellationToken)
+    {
+        // Do nothing by default but allow the derived class to overwrite.
+        return Task.CompletedTask;
+    }
+
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         await _semaphoreSlim.WaitAsync().ConfigureAwait(false);

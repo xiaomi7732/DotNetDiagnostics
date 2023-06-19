@@ -10,7 +10,7 @@ using Microsoft.Extensions.Options;
 
 namespace DotNet.Diagnostics.Counters.Sinks.AzureBlob;
 
-public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload>, IAsyncDisposable
+public sealed class AzureBlobSink : SinkBase<IDotNetCountersClient, ICounterPayload>, IAsyncDisposable
 {
     private bool _isDisposed = false;
     private readonly ConcurrentDictionary<string, MemoryStream> _cache = new ConcurrentDictionary<string, MemoryStream>(StringComparer.Ordinal);
@@ -18,12 +18,7 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
     // Assuming there won't be to much pressure to hold to many items.
     private const int _maxCacheSize = 100 * 1024;
 
-    // private string? _currentStreamKey = null;
-
     private Channel<ICounterPayload>? _workingQueue = null;
-
-    // This makes sure the flushing doesn't happen when the writer's writing the stream.
-    private SemaphoreSlim? _semaphoreSlim = new SemaphoreSlim(1, 1);
 
     private readonly AzureBlobSinkOptions _options;
     private readonly IPayloadWriter _payloadWriter;
@@ -53,45 +48,75 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
         }, LazyThreadSafetyMode.ExecutionAndPublication);
     }
 
-    public async Task FlushAsync(CancellationToken cancellationToken)
-    {
-        if (_isDisposed || _semaphoreSlim is null)
-        {
-            return;
-        }
-
-        _logger.LogDebug("Acquiring semaphore for flushing.");
-        await _semaphoreSlim!.WaitAsync().ConfigureAwait(false);
-        _logger.LogDebug("Acquired semaphore for flushing.");
-        try
-        {
-            await AppendBlobAsync().ConfigureAwait(false);
-        }
-        finally
-        {
-            _semaphoreSlim.Release();
-        }
-    }
-
-    public async Task StartAsync(CancellationToken cancellationToken)
+    public override async Task InitializeAsync(CancellationToken cancellationToken)
     {
         try
         {
+            await base.InitializeAsync(cancellationToken);
             _logger.LogInformation("Ensure blob container exists: {containerName}", _options.ContainerName);
             await _blobContainerClient.Value.CreateIfNotExistsAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
             _logger.LogInformation("Blob container exists.");
 
-            _workingQueue = Channel.CreateUnbounded<ICounterPayload>(new UnboundedChannelOptions()
-            {
-                SingleReader = true,
-                SingleWriter = false,
-            });
-            await StartReadingQueueAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (AuthenticationFailedException ex)
         {
-            _logger.LogError(ex, "Failed starting the sink. Have you configured the client id for the managed identity?");
+            _logger.LogError(ex, "Failed initialize the sink. Have you configured the client id for the managed identity?");
         }
+    }
+
+    protected override Task<bool> OnStartingAsync(CancellationToken cancellationToken)
+    {
+        _workingQueue = Channel.CreateUnbounded<ICounterPayload>(new UnboundedChannelOptions()
+        {
+            SingleReader = true,
+            SingleWriter = false,
+        });
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await StartReadingQueueAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected exception reading working queue.");
+            }
+        }, cancellationToken);
+        return Task.FromResult(true);
+    }
+
+    protected override async Task<bool> OnStoppingAsync(CancellationToken cancellationToken)
+    {
+        if (_isDisposed || _workingQueue is null)
+        {
+            return false;
+        }
+
+        if (!_workingQueue.Writer.TryComplete())
+        {
+            _logger.LogDebug("Writing queue already completed?");
+        }
+
+        await _workingQueue.Reader.Completion.ConfigureAwait(false);
+        await FlushBlobsAsync().ConfigureAwait(false);
+        return true;
+    }
+
+    protected override bool OnSubmit(ICounterPayload data)
+    {
+        if (_workingQueue is null)
+        {
+            _logger.LogTrace("How is sink {name} not enabled?", nameof(AzureBlobSink));
+            return false;
+        }
+
+        bool success = _workingQueue.Writer.TryWrite(data);
+        if (_logger.IsEnabled(LogLevel.Trace))
+        {
+            _logger.LogTrace("Payload submitted. Result: {success}", success);
+        }
+        return success;
     }
 
     /// <summary>
@@ -129,17 +154,6 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
 
     private async Task WriteDataAsync(ICounterPayload data, CancellationToken cancellationToken)
     {
-        bool isTraceEnabled = _logger.IsEnabled(LogLevel.Trace);
-        if (isTraceEnabled)
-        {
-            _logger.LogTrace("Acquiring semaphore writing data...");
-        }
-        await _semaphoreSlim!.WaitAsync(cancellationToken);
-        if (isTraceEnabled)
-        {
-            _logger.LogTrace("Acquired semaphore writing data...");
-        }
-
         try
         {
             string cacheKey = GetBlobName(data.Timestamp);
@@ -155,18 +169,13 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
             if (GetTotalCacheSize() > _maxCacheSize)
             {
                 _logger.LogInformation("Persistent data to Azure Storage.");
-                await AppendBlobAsync();
+                await FlushBlobsAsync();
             }
         }
         catch (OperationCanceledException cancel) when (cancel.CancellationToken == cancellationToken)
         {
             _logger.LogDebug("Writing data operation canceled by the user.");
             throw;
-        }
-        finally
-        {
-            _logger.LogTrace("Release semaphore.");
-            _semaphoreSlim.Release();
         }
     }
 
@@ -175,7 +184,7 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
         return _cache.Values.Sum(s => s.Length);
     }
 
-    private async Task AppendBlobAsync()
+    private async Task FlushBlobsAsync()
     {
         string[] keys = _cache.Keys.ToArray();
         foreach (string key in keys)
@@ -249,29 +258,12 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
         return blobName;
     }
 
-    public bool Submit(ICounterPayload data)
-    {
-        if (_workingQueue is null)
-        {
-            _logger.LogTrace("Sink {name} is not enabled.", nameof(AzureBlobSink));
-            return false;
-        }
-
-        bool success = _workingQueue.Writer.TryWrite(data);
-        if (_logger.IsEnabled(LogLevel.Trace))
-        {
-            _logger.LogTrace("Payload submitted. Result: {success}", success);
-        }
-        return success;
-    }
-
     public async ValueTask DisposeAsync()
     {
         if (_isDisposed)
         {
             return;
         }
-        _isDisposed = true;
 
         if (_workingQueue is not null)
         {
@@ -293,10 +285,10 @@ public sealed class AzureBlobSink : ISink<IDotNetCountersClient, ICounterPayload
             await _workingQueue.Reader.Completion.ConfigureAwait(false);
             _logger.LogDebug("Channel reader completed.");
 
-            await FlushAsync(default).ConfigureAwait(false);
+            await StopAsync(default).ConfigureAwait(false);
         }
 
-        _semaphoreSlim?.Dispose();
-        _semaphoreSlim = null;
+        Dispose();
+        _isDisposed = true;
     }
 }
